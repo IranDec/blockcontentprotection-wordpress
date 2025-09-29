@@ -9,13 +9,24 @@
         document.addEventListener('contextmenu', e => e.preventDefault(), false);
     }
 
-    // Disable Developer Tools
-    if (bcp_settings.disable_devtools) {
+    // Disable Developer Tools & Screenshot
+    if (bcp_settings.disable_devtools || bcp_settings.disable_screenshot) {
         document.addEventListener('keydown', e => {
-            if (e.key === 'F12' ||
-               (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) ||
-               (e.ctrlKey && e.key.toUpperCase() === 'U')) {
+            // DevTools
+            if (bcp_settings.disable_devtools) {
+                if (e.key === 'F12' ||
+                   (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) ||
+                   (e.ctrlKey && e.key.toUpperCase() === 'U')) {
+                    e.preventDefault();
+                }
+            }
+            // Screenshot
+            if (bcp_settings.disable_screenshot && e.key === 'PrintScreen') {
                 e.preventDefault();
+                navigator.clipboard.writeText('');
+                if (bcp_settings.screenshot_alert_message) {
+                    alert(bcp_settings.screenshot_alert_message);
+                }
             }
         });
     }
