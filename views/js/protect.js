@@ -37,20 +37,26 @@
             el.setAttribute('oncontextmenu', 'return false');
         });
 
-        // جلوگیری از انتخاب و کپی پس از دوبار کلیک
-        document.querySelectorAll('p, span, div, h1, h2, h3, h4, h5, h6').forEach(el => {
-            el.addEventListener('mouseup', () => {
-                if (window.getSelection().toString().length > 0) {
-                    setTimeout(() => window.getSelection().removeAllRanges(), 10);
-                }
+        // جلوگیری از انتخاب متن
+        if (typeof BCP_DISABLE_TEXT_SELECTION !== 'undefined' && BCP_DISABLE_TEXT_SELECTION) {
+            document.body.classList.add('unselectable');
+        }
+
+        // محافظت پیشرفته
+        if (typeof BCP_ENHANCED_PROTECTION !== 'undefined' && BCP_ENHANCED_PROTECTION) {
+            document.body.classList.add('enhanced-protection');
+            document.querySelectorAll('video').forEach(video => {
+                video.classList.add('protected-video');
             });
-        });
+        }
     });
 
     // جلوگیری از کپی کردن
-    document.addEventListener('copy', e => {
-        e.preventDefault();
-    });
+    if (typeof BCP_DISABLE_DBLCLICK_COPY !== 'undefined' && BCP_DISABLE_DBLCLICK_COPY) {
+        document.addEventListener('copy', e => {
+            e.preventDefault();
+        });
+    }
 
     // جلوگیری از کشیدن (dragging) تصاویر و ویدیوها
     document.addEventListener('dragstart', e => e.preventDefault());

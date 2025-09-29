@@ -7,7 +7,7 @@ class BlockContentProtection extends Module
     {
         $this->name = 'blockcontentprotection';
         $this->tab = 'front_office_features';
-        $this->version = '1.2.3';
+        $this->version = '1.3.0';
         $this->author = 'Mohammad Babaei';
         $this->website = 'https://adschi.com';
         $this->need_instance = 0;
@@ -30,7 +30,8 @@ class BlockContentProtection extends Module
             Configuration::updateValue('BCP_DISABLE_SCREENSHOT', true) &&
             Configuration::updateValue('BCP_DISABLE_VIDEO_DOWNLOAD', true) &&
             Configuration::updateValue('BCP_DISABLE_DBLCLICK_COPY', true) &&
-            Configuration::updateValue('BCP_DISABLE_TEXT_SELECTION', true);
+            Configuration::updateValue('BCP_DISABLE_TEXT_SELECTION', true) &&
+            Configuration::updateValue('BCP_ENHANCED_PROTECTION', false);
     }
 
     public function uninstall()
@@ -41,7 +42,8 @@ class BlockContentProtection extends Module
             Configuration::deleteByName('BCP_DISABLE_SCREENSHOT') &&
             Configuration::deleteByName('BCP_DISABLE_VIDEO_DOWNLOAD') &&
             Configuration::deleteByName('BCP_DISABLE_DBLCLICK_COPY') &&
-            Configuration::deleteByName('BCP_DISABLE_TEXT_SELECTION');
+            Configuration::deleteByName('BCP_DISABLE_TEXT_SELECTION') &&
+            Configuration::deleteByName('BCP_ENHANCED_PROTECTION');
     }
 
     public function hookHeader()
@@ -52,6 +54,14 @@ class BlockContentProtection extends Module
             ['position' => 'bottom', 'priority' => 150]
         );
 
+        if (Configuration::get('BCP_ENHANCED_PROTECTION')) {
+            $this->context->controller->registerStylesheet(
+                'module-blockcontentprotection-css',
+                'modules/'.$this->name.'/views/css/protect.css',
+                ['media' => 'all', 'priority' => 150]
+            );
+        }
+
         Media::addJsDef([
             'BCP_DISABLE_RIGHTCLICK' => Configuration::get('BCP_DISABLE_RIGHTCLICK'),
             'BCP_DISABLE_DEVTOOLS' => Configuration::get('BCP_DISABLE_DEVTOOLS'),
@@ -59,6 +69,7 @@ class BlockContentProtection extends Module
             'BCP_DISABLE_VIDEO_DOWNLOAD' => Configuration::get('BCP_DISABLE_VIDEO_DOWNLOAD'),
             'BCP_DISABLE_DBLCLICK_COPY' => Configuration::get('BCP_DISABLE_DBLCLICK_COPY'),
             'BCP_DISABLE_TEXT_SELECTION' => Configuration::get('BCP_DISABLE_TEXT_SELECTION'),
+            'BCP_ENHANCED_PROTECTION' => Configuration::get('BCP_ENHANCED_PROTECTION'),
         ]);
     }
 
@@ -81,6 +92,7 @@ class BlockContentProtection extends Module
             Configuration::updateValue('BCP_DISABLE_VIDEO_DOWNLOAD', (bool)Tools::getValue('BCP_DISABLE_VIDEO_DOWNLOAD'));
             Configuration::updateValue('BCP_DISABLE_DBLCLICK_COPY', (bool)Tools::getValue('BCP_DISABLE_DBLCLICK_COPY'));
             Configuration::updateValue('BCP_DISABLE_TEXT_SELECTION', (bool)Tools::getValue('BCP_DISABLE_TEXT_SELECTION'));
+            Configuration::updateValue('BCP_ENHANCED_PROTECTION', (bool)Tools::getValue('BCP_ENHANCED_PROTECTION'));
             $output .= $this->displayConfirmation($this->l('Settings updated'));
         }
 
@@ -135,7 +147,15 @@ class BlockContentProtection extends Module
                         'name' => 'BCP_DISABLE_TEXT_SELECTION',
                         'is_bool' => true,
                         'values' => [['id' => 'active_on', 'value' => 1], ['id' => 'active_off', 'value' => 0]],
-                    ]
+                    ],
+                    [
+                        'type' => 'switch',
+                        'label' => $this->l('Enhanced Screen Protection'),
+                        'desc' => $this->l('This feature attempts to block screenshots and screen recording by applying a protective layer. It may not work on all browsers and can be bypassed.'),
+                        'name' => 'BCP_ENHANCED_PROTECTION',
+                        'is_bool' => true,
+                        'values' => [['id' => 'active_on', 'value' => 1], ['id' => 'active_off', 'value' => 0]],
+                    ],
                 ]
             ]
         ];
@@ -155,6 +175,7 @@ class BlockContentProtection extends Module
             'BCP_DISABLE_VIDEO_DOWNLOAD' => Configuration::get('BCP_DISABLE_VIDEO_DOWNLOAD'),
             'BCP_DISABLE_DBLCLICK_COPY' => Configuration::get('BCP_DISABLE_DBLCLICK_COPY'),
             'BCP_DISABLE_TEXT_SELECTION' => Configuration::get('BCP_DISABLE_TEXT_SELECTION'),
+            'BCP_ENHANCED_PROTECTION' => Configuration::get('BCP_ENHANCED_PROTECTION'),
         ];
 
         return $helper->generateForm([$fields_form]);
