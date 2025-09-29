@@ -40,6 +40,7 @@ function bcp_register_settings() {
         'disable_copy'           => __( 'Disable Copy (Ctrl+C)', 'block-content-protection' ),
         'disable_text_selection' => __( 'Disable Text Selection', 'block-content-protection' ),
         'disable_image_drag'     => __( 'Disable Image Dragging', 'block-content-protection' ),
+        'disable_video_download' => __( 'Disable Video Download', 'block-content-protection' ),
         'disable_screenshot'     => __( 'Disable Screenshot (PrintScreen)', 'block-content-protection' ),
         'enhanced_protection'    => __( 'Enhanced Screen Protection', 'block-content-protection' ),
     ];
@@ -96,7 +97,7 @@ function bcp_sanitize_options( $input ) {
         return $sanitized_input;
     }
 
-    $checkboxes = [ 'disable_right_click', 'disable_devtools', 'disable_copy', 'disable_text_selection', 'disable_image_drag', 'disable_screenshot', 'enhanced_protection' ];
+    $checkboxes = [ 'disable_right_click', 'disable_devtools', 'disable_copy', 'disable_text_selection', 'disable_image_drag', 'disable_video_download', 'disable_screenshot', 'enhanced_protection' ];
     foreach ( $checkboxes as $field ) {
         $sanitized_input[$field] = ! empty( $input[$field] ) ? 1 : 0;
     }
@@ -189,6 +190,7 @@ function bcp_activation() {
         'disable_copy'             => 1,
         'disable_text_selection'   => 1,
         'disable_image_drag'       => 1,
+        'disable_video_download'   => 1,
         'disable_screenshot'       => 1,
         'enhanced_protection'      => 0,
         'whitelisted_ips'          => '',

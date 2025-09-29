@@ -58,4 +58,11 @@
         document.body.classList.add('bcp-enhanced-protection');
     }
 
+    // Disable Video Download
+    if (bcp_settings.disable_video_download) {
+        document.querySelectorAll('video').forEach(video => {
+            video.setAttribute('controlsList', 'nodownload');
+        });
+    }
+
 })();

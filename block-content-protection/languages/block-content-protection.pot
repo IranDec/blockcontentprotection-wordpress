@@ -44,6 +44,10 @@ msgid "Disable Image Dragging"
 msgstr ""
 
 #: ../block-content-protection.php:40
+msgid "Disable Video Download"
+msgstr ""
+
+#: ../block-content-protection.php:41
 msgid "Disable Screenshot (PrintScreen)"
 msgstr ""
 
