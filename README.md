@@ -1,6 +1,6 @@
-# Block Content Protection for PrestaShop
+# Block Content Protection for WordPress
 
-A comprehensive content protection module for PrestaShop 1.7 & 8+, designed to prevent content theft and unauthorized use.
+A comprehensive content protection plugin for WordPress, designed to prevent content theft and unauthorized use.
 
 **Developed by:** Mohammad Babaei - [adschi.com](https://adschi.com)
 
@@ -8,7 +8,7 @@ A comprehensive content protection module for PrestaShop 1.7 & 8+, designed to p
 
 ## Features
 
-This module provides a robust set of features to protect your website's content:
+This plugin provides a robust set of features to protect your website's content:
 
 -   **Disable Right-Click**: Prevents users from opening the context menu.
 -   **Block Developer Tools**: Blocks access to browser developer tools (F12, Ctrl+Shift+I, etc.).
@@ -21,18 +21,19 @@ This module provides a robust set of features to protect your website's content:
 
 ## How to Use
 
-1.  Download the latest release (`.zip` file) from the repository.
-2.  Log in to your PrestaShop back office.
-3.  Navigate to **Modules > Module Manager**.
-4.  Click **Upload a module** and select the downloaded `.zip` file.
-5.  After installation, click **Configure** and enable the protection features you need.
+1.  Download the latest release (`.zip` file).
+2.  Log in to your WordPress admin dashboard.
+3.  Navigate to **Plugins > Add New**.
+4.  Click **Upload Plugin** and select the downloaded `.zip` file.
+5.  After installation, click **Activate**.
+6.  Configure the settings by navigating to **Settings > Content Protection**. Enable the protection features you need.
 
 ---
 ---
 
-# ماژول محافظت از محتوا برای پرستاشاپ
+# پلاگین محافظت از محتوا برای وردپرس
 
-یک ماژول جامع برای محافظت از محتوای فروشگاه‌های پرستاشاپ (نسخه ۱.۷ و ۸ به بالا)، طراحی‌شده برای جلوگیری از سرقت محتوا و استفاده غیرمجاز.
+یک پلاگین جامع برای محافظت از محتوای وب‌سایت‌های وردپرسی، طراحی‌شده برای جلوگیری از سرقت محتوا و استفاده غیرمجاز.
 
 **توسعه‌دهنده:** محمد بابایی - [adschi.com](https://adschi.com)
 
@@ -40,7 +41,7 @@ This module provides a robust set of features to protect your website's content:
 
 ## ویژگی‌ها
 
-این ماژول مجموعه‌ای از قابلیت‌های قدرتمند را برای حفاظت از محتوای وب‌سایت شما فراهم می‌کند:
+این پلاگین مجموعه‌ای از قابلیت‌های قدرتمند را برای حفاظت از محتوای وب‌سایت شما فراهم می‌کند:
 
 -   **غیرفعال کردن راست کلیک**: جلوگیری از باز شدن منوی راست کلیک.
 -   **مسدود کردن ابزارهای توسعه‌دهنده**: مسدود کردن دسترسی به ابزارهای توسعه‌دهنده مرورگر (مانند F12، Ctrl+Shift+I و ...).
@@ -53,8 +54,9 @@ This module provides a robust set of features to protect your website's content:
 
 ## نحوه استفاده
 
-۱. آخرین نسخه ماژول (فایل `.zip`) را دانلود کنید.
-۲. وارد پنل مدیریت پرستاشاپ خود شوید.
-۳. به بخش **ماژول‌ها > مدیریت ماژول** بروید.
-۴. روی دکمه **بارگذاری ماژول** کلیک کرده و فایل `.zip` دانلود شده را انتخاب کنید.
-۵. پس از نصب، روی **پیکربندی** کلیک کرده و قابلیت‌های محافظتی مورد نظر خود را فعال کنید.
+۱. آخرین نسخه پلاگین (فایل `.zip`) را دانلود کنید.
+۲. وارد پنل مدیریت وردپرس خود شوید.
+۳. به بخش **افزونه‌ها > افزودن** بروید.
+۴. روی دکمه **بارگذاری افزونه** کلیک کرده و فایل `.zip` دانلود شده را انتخاب کنید.
+۵. پس از نصب، روی **فعال کردن** کلیک کنید.
+۶. برای پیکربندی، به بخش **تنظیمات > Content Protection** بروید و قابلیت‌های مورد نظر خود را فعال کنید.

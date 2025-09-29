@@ -1,28 +1,25 @@
+/* Prevents printing the page content */
 @media print {
     body, html {
         display: none !important;
+        visibility: hidden !important;
     }
 }
 
-.unselectable {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-
-body.enhanced-protection::after {
+/* Enhanced protection layer to deter screenshots */
+.bcp-enhanced-protection::after {
     content: "";
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
     background-color: transparent;
     pointer-events: none;
-    z-index: 999999;
+    z-index: 99999999;
 }
 
-video.protected-video {
-    filter: brightness(1.01);
+/* A small, nearly invisible filter to disrupt screen recording on some browsers */
+.bcp-enhanced-protection video {
+    filter: brightness(1.001);
 }
