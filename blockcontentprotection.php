@@ -1,183 +1,163 @@
 <?php
-if (!defined('_PS_VERSION_')) exit;
+/**
+ * Plugin Name: Block Content Protection
+ * Description: Protect your site content from being copied. Disables right-click, developer tools, and more.
+ * Version: 1.3.0
+ * Author: Mohammad Babaei
+ * Author URI: https://adschi.com
+ * Text Domain: block-content-protection
+ */
 
-class BlockContentProtection extends Module
-{
-    public function __construct()
-    {
-        $this->name = 'blockcontentprotection';
-        $this->tab = 'front_office_features';
-        $this->version = '1.3.0';
-        $this->author = 'Mohammad Babaei';
-        $this->website = 'https://adschi.com';
-        $this->need_instance = 0;
-        $this->bootstrap = true;
+if (!defined('ABSPATH')) {
+    exit; // Exit if accessed directly.
+}
 
-        parent::__construct();
+// Activation hook to set default options
+function bcp_activate() {
+    $defaults = [
+        'bcp_disable_rightclick' => 'on',
+        'bcp_disable_devtools' => 'on',
+        'bcp_disable_screenshot' => 'on',
+        'bcp_disable_video_download' => 'on',
+        'bcp_disable_dblclick_copy' => 'on',
+        'bcp_disable_text_selection' => 'on',
+        'bcp_enhanced_protection' => 'off',
+    ];
 
-        $this->displayName = $this->l('Content Protection with Settings - ADSCHI');
-        $this->description = $this->l('Protect your site content with customizable options.');
-        $this->ps_versions_compliancy = array('min' => '1.7.0.0', 'max' => _PS_VERSION_);
+    foreach ($defaults as $key => $value) {
+        if (get_option($key) === false) {
+            update_option($key, $value);
+        }
     }
+}
+register_activation_hook(__FILE__, 'bcp_activate');
 
-    public function install()
-    {
-        return parent::install() &&
-            $this->registerHook('header') &&
-            $this->registerHook('displayBackOfficeHeader') &&
-            Configuration::updateValue('BCP_DISABLE_RIGHTCLICK', true) &&
-            Configuration::updateValue('BCP_DISABLE_DEVTOOLS', true) &&
-            Configuration::updateValue('BCP_DISABLE_SCREENSHOT', true) &&
-            Configuration::updateValue('BCP_DISABLE_VIDEO_DOWNLOAD', true) &&
-            Configuration::updateValue('BCP_DISABLE_DBLCLICK_COPY', true) &&
-            Configuration::updateValue('BCP_DISABLE_TEXT_SELECTION', true) &&
-            Configuration::updateValue('BCP_ENHANCED_PROTECTION', false);
+// Deactivation hook to remove options
+function bcp_deactivate() {
+    $options = [
+        'bcp_disable_rightclick',
+        'bcp_disable_devtools',
+        'bcp_disable_screenshot',
+        'bcp_disable_video_download',
+        'bcp_disable_dblclick_copy',
+        'bcp_disable_text_selection',
+        'bcp_enhanced_protection',
+    ];
+    foreach ($options as $option) {
+        delete_option($option);
     }
+}
+register_deactivation_hook(__FILE__, 'bcp_deactivate');
 
-    public function uninstall()
-    {
-        return parent::uninstall() &&
-            Configuration::deleteByName('BCP_DISABLE_RIGHTCLICK') &&
-            Configuration::deleteByName('BCP_DISABLE_DEVTOOLS') &&
-            Configuration::deleteByName('BCP_DISABLE_SCREENSHOT') &&
-            Configuration::deleteByName('BCP_DISABLE_VIDEO_DOWNLOAD') &&
-            Configuration::deleteByName('BCP_DISABLE_DBLCLICK_COPY') &&
-            Configuration::deleteByName('BCP_DISABLE_TEXT_SELECTION') &&
-            Configuration::deleteByName('BCP_ENHANCED_PROTECTION');
-    }
+// Enqueue scripts and styles
+function bcp_enqueue_scripts() {
+    // Enqueue JS
+    wp_enqueue_script(
+        'bcp-protect-js',
+        plugin_dir_url(__FILE__) . 'views/js/protect.js',
+        [],
+        '1.3.0',
+        true
+    );
 
-    public function hookHeader()
-    {
-        $this->context->controller->registerJavascript(
-            'module-blockcontentprotection-js',
-            'modules/'.$this->name.'/views/js/protect.js',
-            ['position' => 'bottom', 'priority' => 150]
-        );
+    // Localize script with settings
+    $settings = [
+        'BCP_DISABLE_RIGHTCLICK' => get_option('bcp_disable_rightclick') === 'on',
+        'BCP_DISABLE_DEVTOOLS' => get_option('bcp_disable_devtools') === 'on',
+        'BCP_DISABLE_SCREENSHOT' => get_option('bcp_disable_screenshot') === 'on',
+        'BCP_DISABLE_VIDEO_DOWNLOAD' => get_option('bcp_disable_video_download') === 'on',
+        'BCP_DISABLE_DBLCLICK_COPY' => get_option('bcp_disable_dblclick_copy') === 'on',
+        'BCP_DISABLE_TEXT_SELECTION' => get_option('bcp_disable_text_selection') === 'on',
+        'BCP_ENHANCED_PROTECTION' => get_option('bcp_enhanced_protection') === 'on',
+    ];
+    wp_localize_script('bcp-protect-js', 'bcp_settings', $settings);
 
-        if (Configuration::get('BCP_ENHANCED_PROTECTION')) {
-            $this->context->controller->registerStylesheet(
-                'module-blockcontentprotection-css',
-                'modules/'.$this->name.'/views/css/protect.css',
-                ['media' => 'all', 'priority' => 150]
+    // Conditionally enqueue CSS for enhanced protection
+    if ($settings['BCP_ENHANCED_PROTECTION']) {
+        // Ensure the CSS file exists before enqueueing
+        if (file_exists(plugin_dir_path(__FILE__) . 'views/css/protect.css')) {
+             wp_enqueue_style(
+                'bcp-protect-css',
+                plugin_dir_url(__FILE__) . 'views/css/protect.css',
+                [],
+                '1.3.0'
             );
         }
-
-        Media::addJsDef([
-            'BCP_DISABLE_RIGHTCLICK' => Configuration::get('BCP_DISABLE_RIGHTCLICK'),
-            'BCP_DISABLE_DEVTOOLS' => Configuration::get('BCP_DISABLE_DEVTOOLS'),
-            'BCP_DISABLE_SCREENSHOT' => Configuration::get('BCP_DISABLE_SCREENSHOT'),
-            'BCP_DISABLE_VIDEO_DOWNLOAD' => Configuration::get('BCP_DISABLE_VIDEO_DOWNLOAD'),
-            'BCP_DISABLE_DBLCLICK_COPY' => Configuration::get('BCP_DISABLE_DBLCLICK_COPY'),
-            'BCP_DISABLE_TEXT_SELECTION' => Configuration::get('BCP_DISABLE_TEXT_SELECTION'),
-            'BCP_ENHANCED_PROTECTION' => Configuration::get('BCP_ENHANCED_PROTECTION'),
-        ]);
     }
+}
+add_action('wp_enqueue_scripts', 'bcp_enqueue_scripts');
 
-    public function hookDisplayBackOfficeHeader()
-    {
-        $this->context->controller->addCSS($this->_path.'views/css/admin.css');
+// Add settings page
+function bcp_add_admin_menu() {
+    add_options_page(
+        'Block Content Protection',
+        'Content Protection',
+        'manage_options',
+        'block_content_protection',
+        'bcp_options_page_html'
+    );
+}
+add_action('admin_menu', 'bcp_add_admin_menu');
+
+// Register settings
+function bcp_register_settings() {
+    $options = [
+        'bcp_disable_rightclick',
+        'bcp_disable_devtools',
+        'bcp_disable_screenshot',
+        'bcp_disable_video_download',
+        'bcp_disable_dblclick_copy',
+        'bcp_disable_text_selection',
+        'bcp_enhanced_protection',
+    ];
+
+    foreach ($options as $option) {
+        register_setting('bcp_settings_group', $option);
     }
+}
+add_action('admin_init', 'bcp_register_settings');
 
-    public function getContent()
-    {
-        $output = '<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-            <img src="'.$this->_path.'logo.png" style="height: 50px;" alt="Module Logo">
-            <strong>Developed by Mohammad Babaei - <a href="https://adschi.com" target="_blank">adschi.com</a></strong>
-        </div>';
-
-        if (Tools::isSubmit('submitBlockContentProtection')) {
-            Configuration::updateValue('BCP_DISABLE_RIGHTCLICK', (bool)Tools::getValue('BCP_DISABLE_RIGHTCLICK'));
-            Configuration::updateValue('BCP_DISABLE_DEVTOOLS', (bool)Tools::getValue('BCP_DISABLE_DEVTOOLS'));
-            Configuration::updateValue('BCP_DISABLE_SCREENSHOT', (bool)Tools::getValue('BCP_DISABLE_SCREENSHOT'));
-            Configuration::updateValue('BCP_DISABLE_VIDEO_DOWNLOAD', (bool)Tools::getValue('BCP_DISABLE_VIDEO_DOWNLOAD'));
-            Configuration::updateValue('BCP_DISABLE_DBLCLICK_COPY', (bool)Tools::getValue('BCP_DISABLE_DBLCLICK_COPY'));
-            Configuration::updateValue('BCP_DISABLE_TEXT_SELECTION', (bool)Tools::getValue('BCP_DISABLE_TEXT_SELECTION'));
-            Configuration::updateValue('BCP_ENHANCED_PROTECTION', (bool)Tools::getValue('BCP_ENHANCED_PROTECTION'));
-            $output .= $this->displayConfirmation($this->l('Settings updated'));
-        }
-
-        return $output . $this->renderForm();
+// Settings page HTML
+function bcp_options_page_html() {
+    if (!current_user_can('manage_options')) {
+        return;
     }
+    ?>
+    <div class="wrap">
+        <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+        <p>Developed by Mohammad Babaei - <a href="https://adschi.com" target="_blank">adschi.com</a></p>
+        <form action="options.php" method="post">
+            <?php settings_fields('bcp_settings_group'); ?>
+            <table class="form-table">
+                <?php
+                bcp_render_option('bcp_disable_rightclick', 'Disable Right Click');
+                bcp_render_option('bcp_disable_devtools', 'Disable Developer Tools');
+                bcp_render_option('bcp_disable_screenshot', 'Disable Screenshots (PrintScreen)');
+                bcp_render_option('bcp_disable_video_download', 'Disable Video Download');
+                bcp_render_option('bcp_disable_dblclick_copy', 'Disable Double Click & Copy');
+                bcp_render_option('bcp_disable_text_selection', 'Disable Text Selection');
+                bcp_render_option('bcp_enhanced_protection', 'Enhanced Screen Protection', 'Attempts to block screenshots and screen recording. May not work in all browsers.');
+                ?>
+            </table>
+            <?php submit_button(); ?>
+        </form>
+    </div>
+    <?php
+}
 
-    protected function renderForm()
-    {
-        $fields_form = [
-            'form' => [
-                'legend' => ['title' => $this->l('Settings')],
-                'submit' => ['title' => $this->l('Save')],
-                'input' => [
-                    [
-                        'type' => 'switch',
-                        'label' => $this->l('Disable Right Click'),
-                        'name' => 'BCP_DISABLE_RIGHTCLICK',
-                        'is_bool' => true,
-                        'values' => [['id' => 'active_on', 'value' => 1], ['id' => 'active_off', 'value' => 0]],
-                    ],
-                    [
-                        'type' => 'switch',
-                        'label' => $this->l('Disable Developer Tools'),
-                        'name' => 'BCP_DISABLE_DEVTOOLS',
-                        'is_bool' => true,
-                        'values' => [['id' => 'active_on', 'value' => 1], ['id' => 'active_off', 'value' => 0]],
-                    ],
-                    [
-                        'type' => 'switch',
-                        'label' => $this->l('Disable Screenshots'),
-                        'name' => 'BCP_DISABLE_SCREENSHOT',
-                        'is_bool' => true,
-                        'values' => [['id' => 'active_on', 'value' => 1], ['id' => 'active_off', 'value' => 0]],
-                    ],
-                    [
-                        'type' => 'switch',
-                        'label' => $this->l('Disable Video Download'),
-                        'name' => 'BCP_DISABLE_VIDEO_DOWNLOAD',
-                        'is_bool' => true,
-                        'values' => [['id' => 'active_on', 'value' => 1], ['id' => 'active_off', 'value' => 0]],
-                    ],
-                    [
-                        'type' => 'switch',
-                        'label' => $this->l('Disable Double Click + Copy'),
-                        'name' => 'BCP_DISABLE_DBLCLICK_COPY',
-                        'is_bool' => true,
-                        'values' => [['id' => 'active_on', 'value' => 1], ['id' => 'active_off', 'value' => 0]],
-                    ],
-                    [
-                        'type' => 'switch',
-                        'label' => $this->l('Disable Text Selection'),
-                        'name' => 'BCP_DISABLE_TEXT_SELECTION',
-                        'is_bool' => true,
-                        'values' => [['id' => 'active_on', 'value' => 1], ['id' => 'active_off', 'value' => 0]],
-                    ],
-                    [
-                        'type' => 'switch',
-                        'label' => $this->l('Enhanced Screen Protection'),
-                        'desc' => $this->l('This feature attempts to block screenshots and screen recording by applying a protective layer. It may not work on all browsers and can be bypassed.'),
-                        'name' => 'BCP_ENHANCED_PROTECTION',
-                        'is_bool' => true,
-                        'values' => [['id' => 'active_on', 'value' => 1], ['id' => 'active_off', 'value' => 0]],
-                    ],
-                ]
-            ]
-        ];
-
-        $helper = new HelperForm();
-        $helper->module = $this;
-        $helper->name_controller = $this->name;
-        $helper->default_form_language = (int)Configuration::get('PS_LANG_DEFAULT');
-        $helper->allow_employee_form_lang = (int)Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG');
-        $helper->title = $this->displayName;
-        $helper->show_cancel_button = false;
-        $helper->submit_action = 'submitBlockContentProtection';
-        $helper->fields_value = [
-            'BCP_DISABLE_RIGHTCLICK' => Configuration::get('BCP_DISABLE_RIGHTCLICK'),
-            'BCP_DISABLE_DEVTOOLS' => Configuration::get('BCP_DISABLE_DEVTOOLS'),
-            'BCP_DISABLE_SCREENSHOT' => Configuration::get('BCP_DISABLE_SCREENSHOT'),
-            'BCP_DISABLE_VIDEO_DOWNLOAD' => Configuration::get('BCP_DISABLE_VIDEO_DOWNLOAD'),
-            'BCP_DISABLE_DBLCLICK_COPY' => Configuration::get('BCP_DISABLE_DBLCLICK_COPY'),
-            'BCP_DISABLE_TEXT_SELECTION' => Configuration::get('BCP_DISABLE_TEXT_SELECTION'),
-            'BCP_ENHANCED_PROTECTION' => Configuration::get('BCP_ENHANCED_PROTECTION'),
-        ];
-
-        return $helper->generateForm([$fields_form]);
-    }
+// Helper function to render a checkbox option
+function bcp_render_option($option_name, $label, $description = '') {
+    ?>
+    <tr valign="top">
+        <th scope="row"><?php echo esc_html($label); ?></th>
+        <td>
+            <label>
+                <input type="checkbox" name="<?php echo esc_attr($option_name); ?>" <?php checked(get_option($option_name), 'on'); ?> />
+                <?php if ($description) : ?>
+                    <p class="description"><?php echo esc_html($description); ?></p>
+                <?php endif; ?>
+            </label>
+        </td>
+    </tr>
+    <?php
 }

@@ -1,13 +1,18 @@
 (() => {
-    if (typeof BCP_DISABLE_RIGHTCLICK !== 'undefined' && BCP_DISABLE_RIGHTCLICK) {
+    // Check if bcp_settings is defined
+    if (typeof bcp_settings === 'undefined') {
+        return;
+    }
+
+    if (bcp_settings.BCP_DISABLE_RIGHTCLICK) {
         document.addEventListener('contextmenu', e => e.preventDefault());
     }
 
-    if (typeof BCP_DISABLE_DEVTOOLS !== 'undefined' && BCP_DISABLE_DEVTOOLS) {
+    if (bcp_settings.BCP_DISABLE_DEVTOOLS) {
         document.addEventListener('keydown', e => {
             if (
-                e.key === 'F12' || 
-                (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) || 
+                e.key === 'F12' ||
+                (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) ||
                 (e.ctrlKey && e.key.toUpperCase() === 'U')
             ) {
                 e.preventDefault();
@@ -15,7 +20,7 @@
         });
     }
 
-    if (typeof BCP_DISABLE_SCREENSHOT !== 'undefined' && BCP_DISABLE_SCREENSHOT) {
+    if (bcp_settings.BCP_DISABLE_SCREENSHOT) {
         document.addEventListener('keydown', e => {
             if (e.key === 'PrintScreen') {
                 navigator.clipboard.writeText('');
@@ -25,10 +30,9 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-        if (typeof BCP_DISABLE_VIDEO_DOWNLOAD !== 'undefined' && BCP_DISABLE_VIDEO_DOWNLOAD) {
+        if (bcp_settings.BCP_DISABLE_VIDEO_DOWNLOAD) {
             document.querySelectorAll('video').forEach(video => {
                 video.setAttribute('controlsList', 'nodownload');
-                video.removeAttribute('download');
             });
         }
 
@@ -37,27 +41,31 @@
             el.setAttribute('oncontextmenu', 'return false');
         });
 
-        // جلوگیری از انتخاب متن
-        if (typeof BCP_DISABLE_TEXT_SELECTION !== 'undefined' && BCP_DISABLE_TEXT_SELECTION) {
-            document.body.classList.add('unselectable');
+        // Disable text selection
+        if (bcp_settings.BCP_DISABLE_TEXT_SELECTION) {
+            document.body.style.userSelect = 'none';
+            document.body.style.webkitUserSelect = 'none';
+            document.body.style.mozUserSelect = 'none';
+            document.body.style.msUserSelect = 'none';
         }
 
-        // محافظت پیشرفته
-        if (typeof BCP_ENHANCED_PROTECTION !== 'undefined' && BCP_ENHANCED_PROTECTION) {
-            document.body.classList.add('enhanced-protection');
-            document.querySelectorAll('video').forEach(video => {
-                video.classList.add('protected-video');
-            });
+        // Enhanced screen protection
+        if (bcp_settings.BCP_ENHANCED_PROTECTION) {
+            document.body.classList.add('bcp-enhanced-protection');
         }
     });
 
-    // جلوگیری از کپی کردن
-    if (typeof BCP_DISABLE_DBLCLICK_COPY !== 'undefined' && BCP_DISABLE_DBLCLICK_COPY) {
+    // Disable copy
+    if (bcp_settings.BCP_DISABLE_DBLCLICK_COPY) {
         document.addEventListener('copy', e => {
             e.preventDefault();
         });
     }
 
-    // جلوگیری از کشیدن (dragging) تصاویر و ویدیوها
-    document.addEventListener('dragstart', e => e.preventDefault());
+    // Disable drag
+    document.addEventListener('dragstart', e => {
+        if (e.target.tagName === 'IMG' || e.target.tagName === 'VIDEO') {
+            e.preventDefault();
+        }
+    });
 })();
