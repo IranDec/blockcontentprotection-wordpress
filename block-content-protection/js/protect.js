@@ -20,12 +20,21 @@
                     e.preventDefault();
                 }
             }
+
             // Screenshot
-            if (bcp_settings.disable_screenshot && e.key === 'PrintScreen') {
-                e.preventDefault();
-                navigator.clipboard.writeText('');
-                if (bcp_settings.screenshot_alert_message) {
-                    alert(bcp_settings.screenshot_alert_message);
+            if (bcp_settings.disable_screenshot) {
+                // Windows: PrintScreen
+                // macOS: Cmd+Shift+3, Cmd+Shift+4
+                const isPrintScreen = e.key === 'PrintScreen';
+                const isMacScreenshot = e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4');
+
+                if (isPrintScreen || isMacScreenshot) {
+                    e.preventDefault();
+                    // Attempt to clear clipboard to prevent pasting the screenshot
+                    navigator.clipboard.writeText('');
+                    if (bcp_settings.screenshot_alert_message) {
+                        alert(bcp_settings.screenshot_alert_message);
+                    }
                 }
             }
         });
