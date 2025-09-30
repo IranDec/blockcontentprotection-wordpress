@@ -41,11 +41,17 @@ function bcp_register_settings() {
         'disable_text_selection' => __( 'Disable Text Selection', 'block-content-protection' ),
         'disable_image_drag'     => __( 'Disable Image Dragging', 'block-content-protection' ),
         'disable_video_download' => __( 'Disable Video Download', 'block-content-protection' ),
-        'disable_screenshot'     => __( 'Disable Screenshot (PrintScreen)', 'block-content-protection' ),
+        'disable_screenshot'     => __( 'Disable Screenshot Shortcuts', 'block-content-protection' ),
         'enhanced_protection'    => __( 'Enhanced Screen Protection', 'block-content-protection' ),
     ];
     foreach ($protection_fields as $id => $label) {
-        $desc = ($id === 'enhanced_protection') ? __( 'Attempts to block screenshots and screen recording. May not work in all browsers.', 'block-content-protection' ) : '';
+        $desc = '';
+        if ($id === 'disable_screenshot') {
+            $desc = __( 'Blocks PrintScreen and macOS screenshot shortcuts (Cmd+Shift+3/4).', 'block-content-protection' );
+        }
+        if ($id === 'enhanced_protection') {
+            $desc = __( 'Applies additional CSS to interfere with screen capture. Note: These methods are not foolproof and can be bypassed.', 'block-content-protection' );
+        }
         add_settings_field( $id, $label, 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_protection_section', [ 'id' => $id, 'description' => $desc ] );
     }
 
