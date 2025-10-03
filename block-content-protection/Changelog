@@ -1,0 +1,160 @@
+# Changelog
+
+All notable changes to Block Content Protection will be documented in this file.
+
+## [1.4.0] - 2025-10-03
+
+### Added
+- **Mobile Screenshot Blocking**: New feature to block screenshots on mobile devices (Android)
+  - FLAG_SECURE meta tag for Android devices
+  - Three-finger gesture detection
+  - Automatic blur on focus loss
+  - Visibility change protection
+  
+- **Video Screen Recording Protection**: New advanced feature to protect videos from screen recording
+  - Detects `getDisplayMedia` API usage
+  - Automatically turns videos black when recording is detected
+  - Continuous monitoring during playback
+  - Multiple protection layers
+  
+- **Enhanced Security Features**:
+  - DevTools opening detection with automatic page blocking
+  - Iframe embedding prevention
+  - Print blocking via CSS
+  - Automatic clipboard clearing after screenshot attempts
+  
+- **New Settings**:
+  - Mobile Screenshot Block toggle
+  - Video Screen Recording Block toggle
+  - Custom alert message for recording detection
+  
+- **CSS Enhancements**:
+  - Mobile-specific protection styles
+  - Video blackout filters
+  - Recording detection visual feedback
+  - Enhanced blur effects
+
+### Changed
+- Updated main plugin file to version 1.4.0
+- Improved JavaScript protection logic
+- Enhanced CSS protection layers
+- Updated README with new features and important notes
+- Improved user experience with better alert messages
+
+### Fixed
+- Better error handling in recording detection
+- Improved mobile device detection
+- Fixed clipboard clearing issues on some browsers
+
+### Technical Details
+- Added Page Visibility API monitoring
+- Implemented MediaDevices API detection
+- Enhanced MutationObserver for dynamic videos
+- Improved cross-browser compatibility
+
+---
+
+## [1.3.0] - 2025-09-29
+
+### Added
+- Enhanced screen protection option
+- Screenshot shortcut blocking (PrintScreen, Cmd+Shift+3/4)
+- Custom alert messages
+- IP whitelist functionality
+- Page/Post exclusion by ID
+
+### Changed
+- Improved settings page UI
+- Better sanitization of user inputs
+- Enhanced protection mechanisms
+
+### Fixed
+- Right-click disable on some themes
+- Text selection issues on mobile
+- Video download attribute not applying
+
+---
+
+## [1.2.0] - 2025-08-15
+
+### Added
+- Video download protection
+- Image drag prevention
+- Developer tools blocking
+- Copy prevention
+
+### Changed
+- Improved code structure
+- Better performance optimization
+
+---
+
+## [1.1.0] - 2025-07-10
+
+### Added
+- Text selection blocking
+- Basic right-click protection
+
+### Changed
+- Initial settings page design
+
+---
+
+## [1.0.0] - 2025-06-01
+
+### Added
+- Initial release
+- Basic right-click protection
+- Developer tools blocking
+- Copy protection
+
+---
+
+## Important Notes
+
+### Version 1.4.0 Limitations
+- Mobile screenshot blocking works better on Android than iOS
+- Video recording protection cannot prevent all hardware-based methods
+- Some advanced users may bypass these protections
+- May impact user experience on some devices
+
+### Upgrade Instructions
+1. Backup your current plugin files
+2. Replace old files with new version
+3. Go to Settings > Content Protection
+4. Enable new features (Mobile Screenshot Block, Video Screen Recording Block)
+5. Customize alert messages
+6. Test on different devices
+
+---
+
+## Roadmap
+
+### Future Versions
+
+**v1.5.0** (Planned)
+- Watermark overlay for images and videos
+- Advanced DRM-like protection
+- Activity logging and reporting
+- Admin notifications for protection violations
+
+**v1.6.0** (Planned)
+- Machine learning-based detection
+- Advanced encryption for sensitive content
+- Multi-language support improvements
+- Performance optimizations
+
+---
+
+## Support
+
+For issues, questions, or feature requests:
+- Website: [adschi.com](https://adschi.com)
+- GitHub: [Your Repository URL]
+- Email: [Your Email]
+
+---
+
+## License
+
+MIT License - Copyright (c) 2025 Mohammad Babaei
