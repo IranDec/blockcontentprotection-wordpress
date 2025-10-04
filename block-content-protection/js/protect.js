@@ -23,14 +23,11 @@
 
             // Screenshot
             if (bcp_settings.disable_screenshot) {
-                // Windows: PrintScreen
-                // macOS: Cmd+Shift+3, Cmd+Shift+4
                 const isPrintScreen = e.key === 'PrintScreen';
                 const isMacScreenshot = e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4');
 
                 if (isPrintScreen || isMacScreenshot) {
                     e.preventDefault();
-                    // Attempt to clear clipboard
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         navigator.clipboard.writeText('').catch(() => {});
                     }
@@ -79,111 +76,126 @@
 
     // Mobile Screenshot Block
     if (bcp_settings.mobile_screenshot_block) {
-        // Add blur on visibility change (works on some devices)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                document.body.classList.add('bcp-blur-content');
-            } else {
-                document.body.classList.remove('bcp-blur-content');
-            }
-        });
-
-        // Detect screenshot attempts on Android
-        let lastTouch = 0;
+        // Detect screenshot attempts on Android (3-finger gesture)
+        let touchCount = 0;
+        let touchTimer;
+        
         document.addEventListener('touchstart', (e) => {
-            const now = Date.now();
-            if (e.touches.length === 3 && now - lastTouch < 500) {
-                if (bcp_settings.screenshot_alert_message) {
-                    alert(bcp_settings.screenshot_alert_message);
-                }
+            touchCount = e.touches.length;
+            
+            // Only alert on 3-finger touch (common screenshot gesture on some devices)
+            if (touchCount >= 3) {
+                clearTimeout(touchTimer);
+                touchTimer = setTimeout(() => {
+                    if (bcp_settings.screenshot_alert_message) {
+                        alert(bcp_settings.screenshot_alert_message);
+                    }
+                }, 100);
             }
-            lastTouch = now;
         });
 
-        // Block on focus loss (screenshot gesture detection)
-        window.addEventListener('blur', () => {
-            document.body.style.filter = 'blur(20px)';
-            setTimeout(() => {
-                document.body.style.filter = '';
-            }, 100);
+        document.addEventListener('touchend', () => {
+            clearTimeout(touchTimer);
+            touchCount = 0;
         });
     }
 
     // Video Screen Recording Block
     if (bcp_settings.video_screen_record_block) {
-        let recordingDetected = false;
+        let isRecording = false;
+        let recordingAlertShown = false;
 
-        // Detect screen recording via Page Visibility API
-        const checkRecording = () => {
-            if (document.hidden) {
-                recordingDetected = true;
-                document.querySelectorAll('video').forEach(video => {
-                    video.classList.add('bcp-video-blocked');
-                    video.style.filter = 'brightness(0)';
+        // Method 1: Try to detect getDisplayMedia (screen capture API)
+        if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+            const original = navigator.mediaDevices.getDisplayMedia;
+            
+            navigator.mediaDevices.getDisplayMedia = function(...args) {
+                isRecording = true;
+                
+                // Black out all videos
+                document.querySelectorAll('video').forEach(v => {
+                    v.style.filter = 'brightness(0)';
+                    v.classList.add('bcp-recording-detected');
                 });
-                if (bcp_settings.recording_alert_message && !document.body.dataset.recordingAlertShown) {
-                    document.body.dataset.recordingAlertShown = 'true';
+                
+                // Show alert once
+                if (!recordingAlertShown && bcp_settings.recording_alert_message) {
                     alert(bcp_settings.recording_alert_message);
+                    recordingAlertShown = true;
+                }
+                
+                return original.apply(this, args).then(stream => {
+                    // When recording stops, restore videos
+                    stream.getTracks().forEach(track => {
+                        track.onended = () => {
+                            isRecording = false;
+                            document.querySelectorAll('video').forEach(v => {
+                                if (!v.classList.contains('bcp-manual-block')) {
+                                    v.style.filter = '';
+                                    v.classList.remove('bcp-recording-detected');
+                                }
+                            });
+                        };
+                    });
+                    return stream;
+                });
+            };
+        }
+
+        // Method 2: Detect via visibility API (less aggressive)
+        let hiddenTime = 0;
+        
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                hiddenTime = Date.now();
+            } else {
+                const duration = Date.now() - hiddenTime;
+                
+                // Only trigger if page was hidden for more than 2 seconds
+                // This prevents false positives from normal tab switching
+                if (duration > 2000 && !isRecording) {
+                    isRecording = true;
+                    
+                    document.querySelectorAll('video').forEach(v => {
+                        if (v.paused === false) { // Only affect playing videos
+                            v.style.filter = 'brightness(0)';
+                            v.classList.add('bcp-recording-detected');
+                        }
+                    });
+                    
+                    if (!recordingAlertShown && bcp_settings.recording_alert_message) {
+                        alert(bcp_settings.recording_alert_message);
+                        recordingAlertShown = true;
+                    }
+                    
+                    // Reset after 5 seconds (in case of false positive)
+                    setTimeout(() => {
+                        if (isRecording) {
+                            isRecording = false;
+                            document.querySelectorAll('video').forEach(v => {
+                                if (!v.classList.contains('bcp-manual-block')) {
+                                    v.style.filter = '';
+                                    v.classList.remove('bcp-recording-detected');
+                                }
+                            });
+                        }
+                    }, 5000);
                 }
             }
-        };
+        });
 
-        document.addEventListener('visibilitychange', checkRecording);
-
-        // Additional recording detection methods
-        const detectRecording = () => {
-            // Check for screen capture via getDisplayMedia
-            if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-                const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia;
-                navigator.mediaDevices.getDisplayMedia = function() {
-                    recordingDetected = true;
-                    document.querySelectorAll('video').forEach(video => {
-                        video.classList.add('bcp-video-blocked');
-                        video.style.filter = 'brightness(0)';
-                    });
-                    if (bcp_settings.recording_alert_message) {
-                        alert(bcp_settings.recording_alert_message);
-                    }
-                    return originalGetDisplayMedia.apply(this, arguments);
-                };
-            }
-        };
-
-        detectRecording();
-
-        // Monitor video elements
+        // Method 3: Apply basic protection to all videos
         const protectVideos = () => {
             document.querySelectorAll('video').forEach(video => {
-                // Add DRM-like protection attributes
+                // Only add attributes, don't black out unless recording detected
                 video.setAttribute('controlsList', 'nodownload noremoteplayback');
                 video.setAttribute('disablePictureInPicture', 'true');
                 
-                // Apply black screen on recording
-                if (recordingDetected) {
+                // Apply filter only if recording was detected
+                if (isRecording && !video.classList.contains('bcp-recording-detected')) {
                     video.style.filter = 'brightness(0)';
+                    video.classList.add('bcp-recording-detected');
                 }
-
-                // Detect if video is being captured
-                video.addEventListener('play', () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    const checkCapture = setInterval(() => {
-                        if (video.paused || video.ended) {
-                            clearInterval(checkCapture);
-                            return;
-                        }
-                        
-                        try {
-                            ctx.drawImage(video, 0, 0);
-                            // If we can draw, no recording; if error, might be recording
-                        } catch (e) {
-                            recordingDetected = true;
-                            video.style.filter = 'brightness(0)';
-                            clearInterval(checkCapture);
-                        }
-                    }, 1000);
-                });
             });
         };
 
@@ -195,32 +207,37 @@
         }
 
         // Watch for new videos added dynamically
-        const observer = new MutationObserver(protectVideos);
-        observer.observe(document.body, { childList: true, subtree: true });
-    }
-
-    // Additional layer: Detect DevTools opening
-    const detectDevTools = () => {
-        const threshold = 160;
-        const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-        const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+        const observer = new MutationObserver(() => {
+            protectVideos();
+        });
         
-        if (widthThreshold || heightThreshold) {
-            document.body.style.display = 'none';
-            if (bcp_settings.disable_devtools) {
-                alert('Developer tools detected. Page access blocked.');
-            }
-        }
-    };
-
-    if (bcp_settings.disable_devtools) {
-        setInterval(detectDevTools, 1000);
-        window.addEventListener('resize', detectDevTools);
+        observer.observe(document.body, { 
+            childList: true, 
+            subtree: true 
+        });
     }
 
-    // Prevent iframe embedding for extra security
-    if (window.top !== window.self) {
-        document.body.style.display = 'none';
+    // DevTools Detection (optional, less aggressive)
+    if (bcp_settings.disable_devtools) {
+        const threshold = 200;
+        let devtoolsOpen = false;
+        
+        const checkDevTools = () => {
+            const widthDiff = window.outerWidth - window.innerWidth;
+            const heightDiff = window.outerHeight - window.innerHeight;
+            
+            if (widthDiff > threshold || heightDiff > threshold) {
+                if (!devtoolsOpen) {
+                    devtoolsOpen = true;
+                    // Just warn, don't block entire page
+                    console.warn('Developer tools detected');
+                }
+            } else {
+                devtoolsOpen = false;
+            }
+        };
+
+        setInterval(checkDevTools, 1000);
     }
 
 })();
