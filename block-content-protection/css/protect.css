@@ -19,17 +19,23 @@
     z-index: 99999999;
 }
 
-/* Mobile screenshot blur protection */
+/* Mobile screenshot blur protection - only when needed */
 .bcp-blur-content {
     filter: blur(20px) !important;
     transition: filter 0.1s;
 }
 
-/* Video protection - black screen on recording */
-.bcp-video-blocked,
-.bcp-enhanced-protection video {
+/* Video protection - ONLY black screen when recording is actually detected */
+video.bcp-recording-detected,
+video.bcp-manual-block {
     filter: brightness(0) !important;
     background: #000 !important;
+}
+
+/* Do NOT apply filter to all videos by default - only when flagged */
+.bcp-enhanced-protection video {
+    /* Removed automatic filter - will only apply when recording detected */
+    position: relative;
 }
 
 /* Additional video protection layers */
@@ -40,7 +46,8 @@ video {
     user-select: none;
 }
 
-video::before {
+/* Optional watermark overlay for videos - very subtle */
+.bcp-enhanced-protection video::before {
     content: "";
     position: absolute;
     top: 0;
@@ -52,24 +59,9 @@ video::before {
     pointer-events: none;
 }
 
-/* Watermark overlay for videos (optional visual deterrent) */
-.bcp-enhanced-protection video::after {
-    content: "Protected Content";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: rgba(255, 255, 255, 0.1);
-    font-size: 3em;
-    font-weight: bold;
-    pointer-events: none;
-    z-index: 9999;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-}
-
 /* Prevent screenshots via CSS (limited effectiveness) */
 @media screen and (min-width: 0) {
-    body {
+    body.bcp-no-select {
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         -khtml-user-select: none;
@@ -81,47 +73,42 @@ video::before {
 
 /* Mobile-specific protections */
 @media (max-width: 768px) {
-    body {
+    body.bcp-mobile-protection {
         -webkit-tap-highlight-color: transparent;
         -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        -khtml-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
     }
     
     /* Additional layer to prevent long-press menu on mobile */
-    * {
+    body.bcp-mobile-protection * {
         -webkit-touch-callout: none !important;
-        -webkit-user-select: none !important;
     }
 }
 
-/* Iframe protection */
-html {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-
-/* Screen recording detection visual */
-body.recording-detected {
-    filter: blur(50px) brightness(0);
-}
-
-body.recording-detected::before {
-    content: "⚠️ Screen Recording Detected";
+/* Screen recording detection visual - only when detected */
+body.bcp-recording-active::before {
+    content: "⚠️ Screen Recording Detected - Video Blocked";
     position: fixed;
-    top: 50%;
+    top: 20px;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
     color: #fff;
-    background: rgba(0, 0, 0, 0.9);
-    padding: 20px 40px;
-    border-radius: 10px;
+    background: rgba(220, 38, 38, 0.95);
+    padding: 12px 24px;
+    border-radius: 8px;
     z-index: 999999999;
-    font-size: 1.5em;
+    font-size: 14px;
     font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
 }
