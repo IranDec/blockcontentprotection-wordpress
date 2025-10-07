@@ -1,114 +1,41 @@
-/* Prevents printing the page content */
-@media print {
-    body, html {
-        display: none !important;
-        visibility: hidden !important;
-    }
+/* Enhanced screen protection */
+.bcp-enhanced-protection {
+    -webkit-filter: brightness(101%); /* Trick some screen capture software */
 }
 
-/* Enhanced protection layer to deter screenshots */
-.bcp-enhanced-protection::after {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: transparent;
-    pointer-events: none;
-    z-index: 99999999;
-}
-
-/* Mobile screenshot blur protection - only when needed */
-.bcp-blur-content {
-    filter: blur(20px) !important;
-    transition: filter 0.1s;
-}
-
-/* Video protection - ONLY black screen when recording is actually detected */
-video.bcp-recording-detected,
-video.bcp-manual-block {
-    filter: brightness(0) !important;
-    background: #000 !important;
-}
-
-/* Do NOT apply filter to all videos by default - only when flagged */
-.bcp-enhanced-protection video {
-    /* Removed automatic filter - will only apply when recording detected */
+/* Watermark styles */
+.bcp-watermark-wrapper {
     position: relative;
+    display: inline-block;
 }
 
-/* Additional video protection layers */
-video {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-
-/* Optional watermark overlay for videos - very subtle */
-.bcp-enhanced-protection video::before {
-    content: "";
+.bcp-watermark {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: transparent;
-    z-index: 1;
-    pointer-events: none;
-}
-
-/* Prevent screenshots via CSS (limited effectiveness) */
-@media screen and (min-width: 0) {
-    body.bcp-no-select {
-        -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        -khtml-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-    }
-}
-
-/* Mobile-specific protections */
-@media (max-width: 768px) {
-    body.bcp-mobile-protection {
-        -webkit-tap-highlight-color: transparent;
-        -webkit-touch-callout: none;
-    }
-    
-    /* Additional layer to prevent long-press menu on mobile */
-    body.bcp-mobile-protection * {
-        -webkit-touch-callout: none !important;
-    }
-}
-
-/* Screen recording detection visual - only when detected */
-body.bcp-recording-active::before {
-    content: "⚠️ Screen Recording Detected - Video Blocked";
-    position: fixed;
     top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: #fff;
-    background: rgba(220, 38, 38, 0.95);
-    padding: 12px 24px;
-    border-radius: 8px;
-    z-index: 999999999;
+    left: 20px;
+    color: rgba(255, 255, 255, 0.5);
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 5px 10px;
+    border-radius: 5px;
     font-size: 14px;
-    font-weight: bold;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    animation: slideDown 0.3s ease-out;
+    pointer-events: none;
+    z-index: 9999;
+    white-space: nowrap;
+
+    /* Add a subtle animation to make it harder to remove */
+    animation: bcp-watermark-move 10s infinite alternate;
 }
 
-@keyframes slideDown {
+@keyframes bcp-watermark-move {
     from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-20px);
+        transform: translate(0, 0);
     }
     to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
+        transform: translate(calc(100vw - 100% - 40px), calc(100vh - 100% - 40px));
     }
+}
+
+/* When screen recording is detected */
+.bcp-recording-detected {
+    filter: brightness(0) !important;
 }

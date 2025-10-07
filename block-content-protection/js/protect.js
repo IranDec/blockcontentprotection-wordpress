@@ -66,12 +66,91 @@
         document.body.classList.add('bcp-enhanced-protection');
     }
 
-    // Disable Video Download
-    if (bcp_settings.disable_video_download) {
-        document.querySelectorAll('video').forEach(video => {
-            video.setAttribute('controlsList', 'nodownload');
-            video.setAttribute('disablePictureInPicture', 'true');
+    // Disable Video Download & Add Watermark
+    if (bcp_settings.disable_video_download || (bcp_settings.watermark_text && bcp_settings.watermark_text.length > 0)) {
+        const processedVideos = new WeakSet();
+
+        const protectVideo = (video) => {
+            if (processedVideos.has(video) || video.dataset.bcpProtected === 'true') return;
+
+            processedVideos.add(video);
+            video.dataset.bcpProtected = 'true';
+
+            const wrapper = video.parentNode.classList.contains('bcp-watermark-wrapper')
+                ? video.parentNode
+                : document.createElement('div');
+
+            const hasWrapper = wrapper.classList.contains('bcp-watermark-wrapper');
+
+            // --- Add Watermark ---
+            if (bcp_settings.watermark_text && bcp_settings.watermark_text.length > 0) {
+                if (!hasWrapper) {
+                    wrapper.classList.add('bcp-watermark-wrapper');
+                    video.parentNode.insertBefore(wrapper, video);
+                    wrapper.appendChild(video);
+                }
+
+                let watermark = wrapper.querySelector('.bcp-watermark');
+                if (!watermark) {
+                    watermark = document.createElement('div');
+                    watermark.classList.add('bcp-watermark');
+                    wrapper.appendChild(watermark);
+                }
+                watermark.textContent = bcp_settings.watermark_text;
+            }
+
+            // --- Improved Download Protection (Blob URL) ---
+            if (bcp_settings.disable_video_download) {
+                video.setAttribute('controlsList', 'nodownload');
+                video.setAttribute('disablePictureInPicture', 'true');
+
+                const originalSrc = video.getAttribute('src') || (video.querySelector('source') ? video.querySelector('source').getAttribute('src') : null);
+
+                if (originalSrc && !originalSrc.startsWith('blob:')) {
+                    video.removeAttribute('src');
+                    video.querySelectorAll('source').forEach(s => s.removeAttribute('src'));
+
+                    fetch(originalSrc, { credentials: 'omit' })
+                        .then(response => {
+                            if (!response.ok) throw new Error('Network response was not ok for: ' + originalSrc);
+                            return response.blob();
+                        })
+                        .then(blob => {
+                            const blobUrl = URL.createObjectURL(blob);
+                            video.src = blobUrl;
+                        })
+                        .catch(err => {
+                            console.error('BCP Error: Could not fetch video for protection.', err);
+                            video.setAttribute('src', originalSrc);
+                        });
+                }
+            }
+        };
+
+        const initProtection = () => {
+            document.querySelectorAll('video').forEach(protectVideo);
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initProtection);
+        } else {
+            initProtection();
+        }
+
+        const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === 1) { // Element node
+                        if (node.tagName === 'VIDEO') {
+                            protectVideo(node);
+                        } else if (node.querySelectorAll) {
+                            node.querySelectorAll('video').forEach(protectVideo);
+                        }
+                    }
+                });
+            });
         });
+        observer.observe(document.body, { childList: true, subtree: true });
     }
 
     // Mobile Screenshot Block
