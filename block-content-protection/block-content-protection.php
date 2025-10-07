@@ -72,6 +72,10 @@ function bcp_register_settings() {
     add_settings_section( 'bcp_messages_section', __( 'Custom Messages', 'block-content-protection' ), null, 'block_content_protection' );
     add_settings_field( 'screenshot_alert_message', __( 'Screenshot Alert Message', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_messages_section', [ 'id' => 'screenshot_alert_message', 'description' => __( 'The message shown when a user tries to take a screenshot.', 'block-content-protection' ) ] );
     add_settings_field( 'recording_alert_message', __( 'Screen Recording Alert', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_messages_section', [ 'id' => 'recording_alert_message', 'description' => __( 'Message shown when screen recording is detected.', 'block-content-protection' ) ] );
+
+    // Watermark Section
+    add_settings_section( 'bcp_watermark_section', __( 'Watermark Settings', 'block-content-protection' ), null, 'block_content_protection' );
+    add_settings_field( 'watermark_text', __( 'Dynamic Watermark Text', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_text', 'description' => __( 'Enter text to display as a watermark over videos. You can use placeholders like {user_login}, {user_email}, {ip_address}, and {date}. Leave blank to disable.', 'block-content-protection' ) ] );
 }
 add_action( 'admin_init', 'bcp_register_settings' );
 
@@ -128,6 +132,9 @@ function bcp_sanitize_options( $input ) {
     }
     if ( isset( $input['recording_alert_message'] ) ) {
         $sanitized_input['recording_alert_message'] = sanitize_text_field( $input['recording_alert_message'] );
+    }
+    if ( isset( $input['watermark_text'] ) ) {
+        $sanitized_input['watermark_text'] = sanitize_text_field( $input['watermark_text'] );
     }
 
     return $sanitized_input;
@@ -203,11 +210,27 @@ function bcp_enqueue_scripts() {
         }
     }
 
-    if ( $is_protection_enabled ) {
+    if ( $is_protection_enabled || ! empty( $options['watermark_text'] ) ) {
+        // Replace watermark placeholders
+        if ( ! empty( $options['watermark_text'] ) ) {
+            $current_user = wp_get_current_user();
+            $ip_address = bcp_get_user_ip();
+            $date = date( get_option( 'date_format' ) );
+
+            $replacements = [
+                '{user_login}' => $current_user->user_login,
+                '{user_email}' => $current_user->user_email,
+                '{ip_address}' => $ip_address,
+                '{date}'       => $date,
+            ];
+
+            $options['watermark_text'] = str_replace( array_keys( $replacements ), array_values( $replacements ), $options['watermark_text'] );
+        }
+
         wp_enqueue_script( 'bcp-protect', BCP_PLUGIN_URL . 'js/protect.js', [], '1.4.0', true );
         wp_localize_script( 'bcp-protect', 'bcp_settings', $options );
 
-        if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) ) {
+        if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['watermark_text'] ) ) {
             wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.4.0' );
         }
     }
@@ -230,6 +253,7 @@ function bcp_activation() {
         'excluded_pages'            => '',
         'screenshot_alert_message'  => 'Screenshots are disabled on this site.',
         'recording_alert_message'   => 'Screen recording detected. Video playback blocked.',
+        'watermark_text'            => '',
     ];
     if ( false === get_option( 'bcp_options' ) ) {
         update_option( 'bcp_options', $defaults );
