@@ -3,7 +3,7 @@
  * Plugin Name:       Block Content Protection
  * Description:       A comprehensive plugin to protect website content. Blocks screenshots, screen recording, right-click, developer tools, and more.
  * Plugin URI:        https://adschi.com/
- * Version:           1.5.1
+ * Version:           1.5.2
  * Author:            Mohammad Babaei
  * Author URI:        https://adschi.com/
  * License:           GPL-2.0+
@@ -385,11 +385,11 @@ function bcp_enqueue_scripts() {
             $options['watermark_text'] = str_replace( array_keys( $replacements ), array_values( $replacements ), $options['watermark_text'] );
         }
 
-        wp_enqueue_script( 'bcp-protect', BCP_PLUGIN_URL . 'js/protect.js', [], '1.5.0', true );
+        wp_enqueue_script( 'bcp-protect', BCP_PLUGIN_URL . 'js/protect.js', [], '1.5.2', true );
         wp_localize_script( 'bcp-protect', 'bcp_settings', $options );
 
         if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_watermark'] ) ) {
-            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.5.0' );
+            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.5.2' );
         }
     }
 }
@@ -406,7 +406,7 @@ function bcp_enqueue_admin_scripts( $hook ) {
         'bcp-admin-styles',
         BCP_PLUGIN_URL . 'admin/css/admin-styles.css',
         [],
-        '1.5.1'
+        '1.5.2'
     );
 
     // Enqueue Admin JS
@@ -414,7 +414,7 @@ function bcp_enqueue_admin_scripts( $hook ) {
         'bcp-admin-scripts',
         BCP_PLUGIN_URL . 'admin/js/admin-scripts.js',
         [],
-        '1.5.1',
+        '1.5.2',
         true
     );
 }

@@ -178,29 +178,74 @@
     if (bcp_settings.video_screen_record_block && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
         const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia;
         let recordingAlertShown = false;
-        
-        navigator.mediaDevices.getDisplayMedia = async function(...args) {
-            // Apply blackout and show alert
-            document.querySelectorAll('video').forEach(v => v.style.filter = 'brightness(0)');
+
+        const handleRecordingStart = () => {
+            document.querySelectorAll('video').forEach(video => {
+                if (video.dataset.bcpBlocked) return;
+
+                const videoWrapper = video.closest('.bcp-watermark-wrapper') || video;
+                const { width, height } = video.getBoundingClientRect();
+
+                const blackBox = document.createElement('div');
+                blackBox.className = 'bcp-blackout-box';
+                blackBox.style.width = `${width}px`;
+                blackBox.style.height = `${height}px`;
+                blackBox.innerHTML = `<span>${bcp_settings.recording_alert_message || 'Recording not permitted.'}</span>`;
+
+                // Replace the video wrapper with the black box
+                videoWrapper.parentNode.insertBefore(blackBox, videoWrapper);
+                videoWrapper.style.display = 'none'; // Hide instead of remove to preserve it
+
+                // Mark as blocked
+                video.dataset.bcpBlocked = 'true';
+                blackBox.dataset.bcpOriginalDisplay = videoWrapper.style.display;
+                blackBox.dataset.bcpTarget = video.id || (video.id = `bcp-video-${Date.now()}`);
+            });
+
+            // Make watermarks more aggressive
+            document.querySelectorAll('.bcp-watermark, .bcp-watermark-pattern-span').forEach(wm => {
+                wm.classList.add('bcp-watermark-aggressive');
+            });
+
             if (!recordingAlertShown && bcp_settings.enable_custom_messages && bcp_settings.recording_alert_message) {
-                alert(bcp_settings.recording_alert_message);
+                // The message is now inside the black box, but an alert can still be useful
+                // alert(bcp_settings.recording_alert_message);
                 recordingAlertShown = true;
             }
+        };
+
+        const handleRecordingStop = () => {
+            document.querySelectorAll('.bcp-blackout-box').forEach(blackBox => {
+                const videoId = blackBox.dataset.bcpTarget;
+                const video = document.getElementById(videoId);
+                if (video) {
+                    const videoWrapper = video.closest('.bcp-watermark-wrapper') || video;
+                    videoWrapper.style.display = blackBox.dataset.bcpOriginalDisplay || '';
+                    delete video.dataset.bcpBlocked;
+                }
+                blackBox.remove();
+            });
+
+            // Revert watermarks to normal
+            document.querySelectorAll('.bcp-watermark-aggressive').forEach(wm => {
+                wm.classList.remove('bcp-watermark-aggressive');
+            });
+
+            recordingAlertShown = false;
+        };
+
+        navigator.mediaDevices.getDisplayMedia = async function(...args) {
+            handleRecordingStart();
             
             try {
                 const stream = await originalGetDisplayMedia.apply(this, args);
-                // When recording stops, restore videos
                 stream.getTracks().forEach(track => {
-                    track.onended = () => {
-                        document.querySelectorAll('video').forEach(v => v.style.filter = '');
-                        recordingAlertShown = false; // Reset for next time
-                    };
+                    track.onended = handleRecordingStop;
                 });
                 return stream;
             } catch (err) {
-                // User cancelled the screen share prompt, restore videos
-                document.querySelectorAll('video').forEach(v => v.style.filter = '');
-                recordingAlertShown = false;
+                // User cancelled the prompt
+                handleRecordingStop();
                 throw err;
             }
         };
