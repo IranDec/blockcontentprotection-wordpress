@@ -3,7 +3,7 @@
  * Plugin Name:       Block Content Protection
  * Description:       A comprehensive plugin to protect website content. Blocks screenshots, screen recording, right-click, developer tools, and more.
  * Plugin URI:        https://adschi.com/
- * Version:           1.5.0
+ * Version:           1.5.1
  * Author:            Mohammad Babaei
  * Author URI:        https://adschi.com/
  * License:           GPL-2.0+
@@ -19,12 +19,14 @@ if ( ! defined( 'WPINC' ) ) {
 define( 'BCP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 function bcp_add_admin_menu() {
-    add_options_page(
+    add_menu_page(
         __( 'Content Protection', 'block-content-protection' ),
         __( 'Content Protection', 'block-content-protection' ),
         'manage_options',
         'block_content_protection',
-        'bcp_options_page'
+        'bcp_options_page',
+        'dashicons-shield-alt', // Icon
+        25 // Position
     );
 }
 add_action( 'admin_menu', 'bcp_add_admin_menu' );
@@ -69,12 +71,20 @@ function bcp_register_settings() {
     add_settings_field( 'excluded_pages', __( 'Excluded Posts/Pages', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_exclusions_section', [ 'id' => 'excluded_pages', 'description' => __( 'Enter a comma-separated list of Post or Page IDs to exclude from protection (e.g., 1, 2, 3).', 'block-content-protection' ) ] );
 
     // Messages Section
-    add_settings_section( 'bcp_messages_section', __( 'Custom Messages', 'block-content-protection' ), null, 'block_content_protection' );
-    add_settings_field( 'screenshot_alert_message', __( 'Screenshot Alert Message', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_messages_section', [ 'id' => 'screenshot_alert_message', 'description' => __( 'The message shown when a user tries to take a screenshot.', 'block-content-protection' ) ] );
-    add_settings_field( 'recording_alert_message', __( 'Screen Recording Alert', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_messages_section', [ 'id' => 'recording_alert_message', 'description' => __( 'Message shown when screen recording is detected.', 'block-content-protection' ) ] );
+    add_settings_section( 'bcp_messages_section', null, null, 'block_content_protection' ); // Section header is in the card
+    add_settings_field( 'enable_custom_messages', __( 'Enable Custom Messages', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_messages_section', [ 'id' => 'enable_custom_messages', 'description' => __( 'Enable to override the default browser alerts with your own messages.', 'block-content-protection' ) ] );
+
+    // The actual fields are rendered inside a wrapper for JS toggling
+    add_settings_field(
+        'custom_messages_fields',
+        '', // No label for the wrapper
+        'bcp_render_message_fields_wrapper',
+        'block_content_protection',
+        'bcp_messages_section'
+    );
 
     // Watermark Section
-    add_settings_section( 'bcp_watermark_section', __( 'Watermark Settings', 'block-content-protection' ), null, 'block_content_protection' );
+    add_settings_section( 'bcp_watermark_section', null, null, 'block_content_protection' ); // Section header is in the card
     add_settings_field( 'enable_watermark', __( 'Enable Dynamic Watermark', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'enable_watermark', 'description' => __( 'Enable this to show a dynamic watermark over videos.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_text', __( 'Watermark Text', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_text', 'description' => __( 'Enter text for the watermark. Use placeholders: {user_login}, {user_email}, {user_mobile}, {ip_address}, {date}.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_opacity', __( 'Watermark Opacity', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_opacity', 'description' => __( 'Set the opacity from 0 (transparent) to 1 (opaque). Default: 0.5', 'block-content-protection' ), 'min' => 0, 'max' => 1, 'step' => '0.1' ] );
@@ -82,6 +92,39 @@ function bcp_register_settings() {
     add_settings_field( 'watermark_style', __( 'Watermark Style', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_style', 'description' => __( 'Select the watermark style.', 'block-content-protection' ), 'options' => [ 'text' => 'Simple Text', 'pattern' => 'Pattern' ] ] );
 }
 add_action( 'admin_init', 'bcp_register_settings' );
+
+function bcp_render_message_fields_wrapper() {
+    $options = get_option( 'bcp_options' );
+    $is_enabled = isset( $options['enable_custom_messages'] ) && $options['enable_custom_messages'];
+    $hidden_class = ! $is_enabled ? 'bcp-hidden' : '';
+
+    echo '<tbody id="bcp_messages_section_fields" class="' . esc_attr( $hidden_class ) . '">';
+
+    // Re-creating the fields manually here since they are inside a different structure
+    // Screenshot Alert Message
+    echo '<tr>';
+    echo '<th scope="row">' . esc_html__( 'Screenshot Alert Message', 'block-content-protection' ) . '</th>';
+    echo '<td>';
+    bcp_render_textfield_field([
+        'id' => 'screenshot_alert_message',
+        'description' => __( 'The message shown when a user tries to take a screenshot.', 'block-content-protection' )
+    ]);
+    echo '</td>';
+    echo '</tr>';
+
+    // Screen Recording Alert
+    echo '<tr>';
+    echo '<th scope="row">' . esc_html__( 'Screen Recording Alert', 'block-content-protection' ) . '</th>';
+    echo '<td>';
+    bcp_render_textfield_field([
+        'id' => 'recording_alert_message',
+        'description' => __( 'Message shown when screen recording is detected.', 'block-content-protection' )
+    ]);
+    echo '</td>';
+    echo '</tr>';
+
+    echo '</tbody>';
+}
 
 function bcp_render_select_field( $args ) {
     $options = get_option( 'bcp_options', [] );
@@ -147,7 +190,7 @@ function bcp_sanitize_options( $input ) {
         return $sanitized_input;
     }
 
-    $checkboxes = [ 'disable_right_click', 'disable_devtools', 'disable_copy', 'disable_text_selection', 'disable_image_drag', 'disable_video_download', 'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block', 'video_screen_record_block', 'enable_watermark' ];
+    $checkboxes = [ 'disable_right_click', 'disable_devtools', 'disable_copy', 'disable_text_selection', 'disable_image_drag', 'disable_video_download', 'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block', 'video_screen_record_block', 'enable_watermark', 'enable_custom_messages' ];
     foreach ( $checkboxes as $field ) {
         $sanitized_input[$field] = ! empty( $input[$field] ) ? 1 : 0;
     }
@@ -181,20 +224,85 @@ function bcp_sanitize_options( $input ) {
 }
 
 function bcp_options_page() {
+    $plugin_data = get_plugin_data( __FILE__ );
     ?>
-    <div class="wrap">
-        <h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
-        <p>Developed by Mohammad Babaei - <a href="https://adschi.com" target="_blank">adschi.com</a></p>
-        <div class="notice notice-warning">
-            <p><strong>⚠️ توجه:</strong> جلوگیری کامل از اسکرین‌شات و ضبط صفحه غیرممکن است. این ابزارها فقط سخت‌تر می‌کنند، نه غیرممکن.</p>
+    <div class="wrap bcp-wrap">
+        <div class="bcp-header">
+            <h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+            <div class="bcp-author">
+                <span><?php printf( __( 'Developed by %s', 'block-content-protection' ), '<a href="' . esc_url( $plugin_data['AuthorURI'] ) . '" target="_blank">' . esc_html( $plugin_data['Author'] ) . '</a>' ); ?></span>
+            </div>
         </div>
+
+        <div class="notice notice-warning">
+            <p><strong>⚠️ <?php _e( 'Attention:', 'block-content-protection' ); ?></strong> <?php _e( 'Completely preventing screenshots and screen recording is impossible. These tools only make it more difficult, not impossible.', 'block-content-protection' ); ?></p>
+        </div>
+
         <form action="options.php" method="post">
-            <?php
-            settings_fields( 'bcp_settings_group' );
-            do_settings_sections( 'block_content_protection' );
-            submit_button( __( 'Save Settings', 'block-content-protection' ) );
-            ?>
+            <?php settings_fields( 'bcp_settings_group' ); ?>
+            <div class="bcp-content">
+                <div class="bcp-main">
+                    <!-- Protection Settings Card -->
+                    <div class="bcp-card">
+                        <h2 class="bcp-card-header"><?php _e( 'Protection Settings', 'block-content-protection' ); ?></h2>
+                        <div class="bcp-card-body">
+                            <table class="form-table">
+                                <?php do_settings_fields( 'block_content_protection', 'bcp_protection_section' ); ?>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Watermark Settings Card -->
+                    <div class="bcp-card">
+                        <h2 class="bcp-card-header"><?php _e( 'Watermark Settings', 'block-content-protection' ); ?></h2>
+                        <div class="bcp-card-body">
+                            <table class="form-table">
+                                <?php do_settings_fields( 'block_content_protection', 'bcp_watermark_section' ); ?>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bcp-sidebar">
+                    <!-- Exclusion Settings Card -->
+                    <div class="bcp-card">
+                        <h2 class="bcp-card-header"><?php _e( 'Exclusion Settings', 'block-content-protection' ); ?></h2>
+                        <div class="bcp-card-body">
+                            <table class="form-table">
+                                <?php do_settings_fields( 'block_content_protection', 'bcp_exclusions_section' ); ?>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Messages Card -->
+                    <div class="bcp-card">
+                        <h2 class="bcp-card-header"><?php _e( 'Custom Messages', 'block-content-protection' ); ?></h2>
+                        <div class="bcp-card-body">
+                            <table class="form-table">
+                                <?php do_settings_fields( 'block_content_protection', 'bcp_messages_section' ); ?>
+                            </table>
+                        </div>
+                    </div>
+                     <div class="bcp-card">
+                        <div class="bcp-card-body">
+                             <?php submit_button( __( 'Save Settings', 'block-content-protection' ) ); ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </form>
+
+        <div class="bcp-footer">
+            <p>
+                <?php
+                printf(
+                    __( 'Thank you for using %s! Version %s', 'block-content-protection' ),
+                    esc_html( $plugin_data['Name'] ),
+                    esc_html( $plugin_data['Version'] )
+                );
+                ?>
+            </p>
+        </div>
     </div>
     <?php
 }
@@ -287,6 +395,31 @@ function bcp_enqueue_scripts() {
 }
 add_action( 'wp_enqueue_scripts', 'bcp_enqueue_scripts' );
 
+function bcp_enqueue_admin_scripts( $hook ) {
+    // Only load on our plugin's settings page
+    if ( 'toplevel_page_block_content_protection' !== $hook ) {
+        return;
+    }
+
+    // Enqueue Admin CSS
+    wp_enqueue_style(
+        'bcp-admin-styles',
+        BCP_PLUGIN_URL . 'admin/css/admin-styles.css',
+        [],
+        '1.5.1'
+    );
+
+    // Enqueue Admin JS
+    wp_enqueue_script(
+        'bcp-admin-scripts',
+        BCP_PLUGIN_URL . 'admin/js/admin-scripts.js',
+        [],
+        '1.5.1',
+        true
+    );
+}
+add_action( 'admin_enqueue_scripts', 'bcp_enqueue_admin_scripts' );
+
 function bcp_activation() {
     $defaults = [
         'disable_right_click'       => 1,
@@ -303,6 +436,7 @@ function bcp_activation() {
         'excluded_pages'            => '',
         'screenshot_alert_message'  => 'Screenshots are disabled on this site.',
         'recording_alert_message'   => 'Screen recording detected. Video playback blocked.',
+        'enable_custom_messages'    => 0,
         'watermark_text'            => '',
         'enable_watermark'          => 0,
         'watermark_opacity'         => 0.5,

@@ -1,0 +1,115 @@
+/* BCP Admin Page General Styles */
+.wrap.bcp-wrap {
+    max-width: 1200px;
+}
+
+.bcp-header {
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    padding: 20px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.bcp-header h1 {
+    margin: 0;
+    font-size: 24px;
+}
+
+.bcp-header .bcp-author {
+    font-size: 14px;
+    color: #555;
+}
+
+/* Main content wrapper */
+.bcp-content {
+    display: flex;
+    gap: 20px;
+}
+
+/* Main settings column */
+.bcp-main {
+    flex: 1;
+}
+
+/* Sidebar column */
+.bcp-sidebar {
+    width: 300px;
+}
+
+/* Card style for sections */
+.bcp-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    margin-bottom: 20px;
+}
+
+.bcp-card .bcp-card-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #ddd;
+    margin: 0;
+    font-size: 16px;
+}
+
+.bcp-card .bcp-card-body {
+    padding: 20px;
+}
+
+.bcp-card .bcp-card-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #ddd;
+    background: #f9f9f9;
+}
+
+/* Form table styling */
+.form-table {
+    margin: 0;
+}
+
+.form-table th {
+    font-weight: 600;
+    padding: 15px 20px;
+    width: 200px;
+}
+
+.form-table td {
+    padding: 15px 20px;
+}
+
+.form-table tr:not(:last-child) {
+    border-bottom: 1px solid #eee;
+}
+
+.form-table p.description {
+    font-size: 13px;
+    color: #666;
+}
+
+/* Footer styles */
+.bcp-footer {
+    text-align: center;
+    margin-top: 30px;
+    padding: 20px;
+    background: #fff;
+    border-top: 1px solid #ddd;
+}
+
+.bcp-footer p {
+    margin: 0;
+    color: #777;
+}
+
+/* Specific field styling */
+.bcp-card-body .regular-text,
+.bcp-card-body .large-text {
+    width: 100%;
+}
+
+/* Hide/show for JS */
+.bcp-hidden {
+    display: none;
+}

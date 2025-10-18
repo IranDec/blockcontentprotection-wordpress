@@ -167,7 +167,7 @@
             // Screenshot
             if (bcp_settings.disable_screenshot && (e.key === 'PrintScreen' || (ctrl && e.shiftKey && ['3', '4', 'S'].includes(key)))) {
                 e.preventDefault();
-                if (bcp_settings.screenshot_alert_message) {
+                if (bcp_settings.enable_custom_messages && bcp_settings.screenshot_alert_message) {
                     alert(bcp_settings.screenshot_alert_message);
                 }
             }
@@ -182,7 +182,7 @@
         navigator.mediaDevices.getDisplayMedia = async function(...args) {
             // Apply blackout and show alert
             document.querySelectorAll('video').forEach(v => v.style.filter = 'brightness(0)');
-            if (!recordingAlertShown && bcp_settings.recording_alert_message) {
+            if (!recordingAlertShown && bcp_settings.enable_custom_messages && bcp_settings.recording_alert_message) {
                 alert(bcp_settings.recording_alert_message);
                 recordingAlertShown = true;
             }
