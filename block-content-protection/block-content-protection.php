@@ -3,7 +3,7 @@
  * Plugin Name:       Block Content Protection
  * Description:       A comprehensive plugin to protect website content. Blocks screenshots, screen recording, right-click, developer tools, and more.
  * Plugin URI:        https://adschi.com/
- * Version:           1.4.0
+ * Version:           1.5.0
  * Author:            Mohammad Babaei
  * Author URI:        https://adschi.com/
  * License:           GPL-2.0+
@@ -75,9 +75,40 @@ function bcp_register_settings() {
 
     // Watermark Section
     add_settings_section( 'bcp_watermark_section', __( 'Watermark Settings', 'block-content-protection' ), null, 'block_content_protection' );
-    add_settings_field( 'watermark_text', __( 'Dynamic Watermark Text', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_text', 'description' => __( 'Enter text to display as a watermark over videos. You can use placeholders like {user_login}, {user_email}, {ip_address}, and {date}. Leave blank to disable.', 'block-content-protection' ) ] );
+    add_settings_field( 'enable_watermark', __( 'Enable Dynamic Watermark', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'enable_watermark', 'description' => __( 'Enable this to show a dynamic watermark over videos.', 'block-content-protection' ) ] );
+    add_settings_field( 'watermark_text', __( 'Watermark Text', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_text', 'description' => __( 'Enter text for the watermark. Use placeholders: {user_login}, {user_email}, {user_mobile}, {ip_address}, {date}.', 'block-content-protection' ) ] );
+    add_settings_field( 'watermark_opacity', __( 'Watermark Opacity', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_opacity', 'description' => __( 'Set the opacity from 0 (transparent) to 1 (opaque). Default: 0.5', 'block-content-protection' ), 'min' => 0, 'max' => 1, 'step' => '0.1' ] );
+    add_settings_field( 'watermark_position', __( 'Watermark Position', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_position', 'description' => __( 'Select the watermark position.', 'block-content-protection' ), 'options' => [ 'animated' => 'Animated', 'top_left' => 'Top Left', 'top_right' => 'Top Right', 'bottom_left' => 'Bottom Left', 'bottom_right' => 'Bottom Right', ] ] );
+    add_settings_field( 'watermark_style', __( 'Watermark Style', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_style', 'description' => __( 'Select the watermark style.', 'block-content-protection' ), 'options' => [ 'text' => 'Simple Text', 'pattern' => 'Pattern' ] ] );
 }
 add_action( 'admin_init', 'bcp_register_settings' );
+
+function bcp_render_select_field( $args ) {
+    $options = get_option( 'bcp_options', [] );
+    $id = $args['id'];
+    $value = isset( $options[$id] ) ? esc_attr( $options[$id] ) : '';
+    echo "<select id='$id' name='bcp_options[$id]'>";
+    foreach ( $args['options'] as $val => $label ) {
+        echo "<option value='" . esc_attr( $val ) . "' " . selected( $value, $val, false ) . ">" . esc_html( $label ) . "</option>";
+    }
+    echo "</select>";
+    if ( ! empty( $args['description'] ) ) {
+        echo '<p class="description">' . esc_html( $args['description'] ) . '</p>';
+    }
+}
+
+function bcp_render_number_field( $args ) {
+    $options = get_option( 'bcp_options', [] );
+    $id = $args['id'];
+    $value = isset( $options[$id] ) ? esc_attr( $options[$id] ) : '';
+    $min = isset( $args['min'] ) ? $args['min'] : '';
+    $max = isset( $args['max'] ) ? $args['max'] : '';
+    $step = isset( $args['step'] ) ? $args['step'] : '';
+    echo "<input type='number' id='$id' name='bcp_options[$id]' value='$value' class='regular-text' min='$min' max='$max' step='$step' />";
+    if ( ! empty( $args['description'] ) ) {
+        echo '<p class="description">' . esc_html( $args['description'] ) . '</p>';
+    }
+}
 
 function bcp_render_checkbox_field( $args ) {
     $options = get_option( 'bcp_options', [] );
@@ -116,7 +147,7 @@ function bcp_sanitize_options( $input ) {
         return $sanitized_input;
     }
 
-    $checkboxes = [ 'disable_right_click', 'disable_devtools', 'disable_copy', 'disable_text_selection', 'disable_image_drag', 'disable_video_download', 'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block', 'video_screen_record_block' ];
+    $checkboxes = [ 'disable_right_click', 'disable_devtools', 'disable_copy', 'disable_text_selection', 'disable_image_drag', 'disable_video_download', 'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block', 'video_screen_record_block', 'enable_watermark' ];
     foreach ( $checkboxes as $field ) {
         $sanitized_input[$field] = ! empty( $input[$field] ) ? 1 : 0;
     }
@@ -135,6 +166,15 @@ function bcp_sanitize_options( $input ) {
     }
     if ( isset( $input['watermark_text'] ) ) {
         $sanitized_input['watermark_text'] = sanitize_text_field( $input['watermark_text'] );
+    }
+    if ( isset( $input['watermark_opacity'] ) ) {
+        $sanitized_input['watermark_opacity'] = floatval( $input['watermark_opacity'] );
+    }
+    if ( isset( $input['watermark_position'] ) ) {
+        $sanitized_input['watermark_position'] = sanitize_key( $input['watermark_position'] );
+    }
+    if ( isset( $input['watermark_style'] ) ) {
+        $sanitized_input['watermark_style'] = sanitize_key( $input['watermark_style'] );
     }
 
     return $sanitized_input;
@@ -210,28 +250,38 @@ function bcp_enqueue_scripts() {
         }
     }
 
-    if ( $is_protection_enabled || ! empty( $options['watermark_text'] ) ) {
+    if ( $is_protection_enabled || ! empty( $options['enable_watermark'] ) ) {
         // Replace watermark placeholders
-        if ( ! empty( $options['watermark_text'] ) ) {
+        if ( ! empty( $options['enable_watermark'] ) && ! empty( $options['watermark_text'] ) ) {
             $current_user = wp_get_current_user();
             $ip_address = bcp_get_user_ip();
             $date = date( get_option( 'date_format' ) );
+            $user_mobile = $current_user->user_login; // Fallback to username
+
+            // Check for Digits plugin mobile number
+            if ( function_exists( 'get_user_meta' ) && $current_user->ID ) {
+                $digits_mobile = get_user_meta( $current_user->ID, 'digits_phone', true );
+                if ( ! empty( $digits_mobile ) ) {
+                    $user_mobile = $digits_mobile;
+                }
+            }
 
             $replacements = [
-                '{user_login}' => $current_user->user_login,
-                '{user_email}' => $current_user->user_email,
-                '{ip_address}' => $ip_address,
-                '{date}'       => $date,
+                '{user_login}'  => $current_user->user_login,
+                '{user_email}'  => $current_user->user_email,
+                '{user_mobile}' => $user_mobile,
+                '{ip_address}'  => $ip_address,
+                '{date}'        => $date,
             ];
 
             $options['watermark_text'] = str_replace( array_keys( $replacements ), array_values( $replacements ), $options['watermark_text'] );
         }
 
-        wp_enqueue_script( 'bcp-protect', BCP_PLUGIN_URL . 'js/protect.js', [], '1.4.0', true );
+        wp_enqueue_script( 'bcp-protect', BCP_PLUGIN_URL . 'js/protect.js', [], '1.5.0', true );
         wp_localize_script( 'bcp-protect', 'bcp_settings', $options );
 
-        if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['watermark_text'] ) ) {
-            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.4.0' );
+        if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_watermark'] ) ) {
+            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.5.0' );
         }
     }
 }
@@ -254,6 +304,10 @@ function bcp_activation() {
         'screenshot_alert_message'  => 'Screenshots are disabled on this site.',
         'recording_alert_message'   => 'Screen recording detected. Video playback blocked.',
         'watermark_text'            => '',
+        'enable_watermark'          => 0,
+        'watermark_opacity'         => 0.5,
+        'watermark_position'        => 'animated',
+        'watermark_style'           => 'text',
     ];
     if ( false === get_option( 'bcp_options' ) ) {
         update_option( 'bcp_options', $defaults );
