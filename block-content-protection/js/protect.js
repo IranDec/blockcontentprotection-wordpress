@@ -12,11 +12,30 @@
         processedVideos.add(video);
         video.dataset.bcpProtected = 'true';
 
-        // Apply general protections
+        // Apply general protections that don't depend on other settings
         video.setAttribute('controlsList', 'nodownload');
         video.setAttribute('disablePictureInPicture', 'true');
 
-        // A. Improved Download Protection (Blob URL)
+        // A. Handle Watermarking
+        // If watermarking is enabled, we need to create the wrapper first.
+        let wrapper = video.closest('.bcp-watermark-wrapper');
+        if (!wrapper) {
+            wrapper = document.createElement('div');
+            wrapper.classList.add('bcp-watermark-wrapper');
+            video.parentNode.insertBefore(wrapper, video);
+            wrapper.appendChild(video);
+        }
+
+        if (bcp_settings.enable_watermark && bcp_settings.watermark_text && bcp_settings.watermark_text.length > 0) {
+            applyWatermark(wrapper, video);
+        }
+
+        // Add a transparent overlay to block IDM and other downloaders
+        const overlay = document.createElement('div');
+        overlay.classList.add('bcp-click-overlay');
+        wrapper.appendChild(overlay);
+
+        // B. Improved Download Protection (Blob URL)
         if (bcp_settings.disable_video_download) {
             const originalSrc = video.getAttribute('src') || (video.querySelector('source') ? video.querySelector('source').getAttribute('src') : null);
             if (originalSrc && !originalSrc.startsWith('blob:')) {
@@ -37,16 +56,6 @@
                         video.setAttribute('src', originalSrc); // Restore original src on failure
                     });
             }
-        }
-
-        // B. Dynamic Watermark
-        if (bcp_settings.enable_watermark && bcp_settings.watermark_text && bcp_settings.watermark_text.length > 0) {
-            const wrapper = document.createElement('div');
-            wrapper.classList.add('bcp-watermark-wrapper');
-            video.parentNode.insertBefore(wrapper, video);
-            wrapper.appendChild(video);
-
-            applyWatermark(wrapper, video);
         }
     };
 
