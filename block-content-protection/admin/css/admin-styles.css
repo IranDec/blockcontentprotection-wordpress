@@ -113,3 +113,48 @@
 .bcp-hidden {
     display: none;
 }
+
+/* --- Toggle Switch Styles --- */
+.form-table td label {
+    display: inline-flex;
+    align-items: center;
+}
+
+.form-table td label input[type="checkbox"] {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.bcp-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    background-color: #ccc;
+    border-radius: 28px;
+    transition: background-color 0.3s;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+.bcp-switch::before {
+    content: "";
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background-color: white;
+    top: 3px;
+    left: 4px;
+    transition: transform 0.3s;
+}
+
+input:checked + .bcp-switch {
+    background-color: #2196F3; /* Blue when checked */
+}
+
+input:checked + .bcp-switch::before {
+    transform: translateX(21px);
+}
