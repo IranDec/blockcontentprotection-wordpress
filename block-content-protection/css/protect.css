@@ -77,28 +77,9 @@
     }
 }
 
-/* When screen recording is detected */
-.bcp-recording-detected {
+/* When screen recording is detected, we apply this class to the video wrapper. */
+.bcp-recording-detected > video {
     filter: brightness(0) !important;
-}
-
-.bcp-blackout-box {
-    background-color: #000;
-    color: #fff;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    font-size: 16px;
-    font-family: sans-serif;
-    z-index: 10000;
-}
-
-.bcp-watermark-aggressive {
-    font-size: 20px !important;
-    opacity: 1 !important;
-    font-weight: bold;
-    color: rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Click overlay for download manager blocking */
