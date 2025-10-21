@@ -35,6 +35,15 @@
         overlay.classList.add('bcp-click-overlay');
         wrapper.appendChild(overlay);
 
+        // Add click listener to the overlay to control the video
+        overlay.addEventListener('click', () => {
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
+        });
+
         // B. Improved Download Protection (Blob URL)
         if (bcp_settings.disable_video_download) {
             const originalSrc = video.getAttribute('src') || (video.querySelector('source') ? video.querySelector('source').getAttribute('src') : null);
@@ -186,74 +195,36 @@
     // Screen Recording Detection
     if (bcp_settings.video_screen_record_block && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
         const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia;
-        let recordingAlertShown = false;
 
+        // This function adds a class to the video wrapper to apply the blackout effect from CSS.
         const handleRecordingStart = () => {
             document.querySelectorAll('video').forEach(video => {
-                if (video.dataset.bcpBlocked) return;
-
-                const videoWrapper = video.closest('.bcp-watermark-wrapper') || video;
-                const { width, height } = video.getBoundingClientRect();
-
-                const blackBox = document.createElement('div');
-                blackBox.className = 'bcp-blackout-box';
-                blackBox.style.width = `${width}px`;
-                blackBox.style.height = `${height}px`;
-                blackBox.innerHTML = `<span>${bcp_settings.recording_alert_message || 'Recording not permitted.'}</span>`;
-
-                // Replace the video wrapper with the black box
-                videoWrapper.parentNode.insertBefore(blackBox, videoWrapper);
-                videoWrapper.style.display = 'none'; // Hide instead of remove to preserve it
-
-                // Mark as blocked
-                video.dataset.bcpBlocked = 'true';
-                blackBox.dataset.bcpOriginalDisplay = videoWrapper.style.display;
-                blackBox.dataset.bcpTarget = video.id || (video.id = `bcp-video-${Date.now()}`);
+                const wrapper = video.closest('.bcp-watermark-wrapper') || video;
+                wrapper.classList.add('bcp-recording-detected');
             });
-
-            // Make watermarks more aggressive
-            document.querySelectorAll('.bcp-watermark, .bcp-watermark-pattern-span').forEach(wm => {
-                wm.classList.add('bcp-watermark-aggressive');
-            });
-
-            if (!recordingAlertShown && bcp_settings.enable_custom_messages && bcp_settings.recording_alert_message) {
-                // The message is now inside the black box, but an alert can still be useful
-                // alert(bcp_settings.recording_alert_message);
-                recordingAlertShown = true;
-            }
         };
 
+        // This function removes the class to restore the video.
         const handleRecordingStop = () => {
-            document.querySelectorAll('.bcp-blackout-box').forEach(blackBox => {
-                const videoId = blackBox.dataset.bcpTarget;
-                const video = document.getElementById(videoId);
-                if (video) {
-                    const videoWrapper = video.closest('.bcp-watermark-wrapper') || video;
-                    videoWrapper.style.display = blackBox.dataset.bcpOriginalDisplay || '';
-                    delete video.dataset.bcpBlocked;
-                }
-                blackBox.remove();
+            document.querySelectorAll('.bcp-recording-detected').forEach(wrapper => {
+                wrapper.classList.remove('bcp-recording-detected');
             });
-
-            // Revert watermarks to normal
-            document.querySelectorAll('.bcp-watermark-aggressive').forEach(wm => {
-                wm.classList.remove('bcp-watermark-aggressive');
-            });
-
-            recordingAlertShown = false;
         };
 
+        // We override the native getDisplayMedia function to hook into the screen sharing process.
         navigator.mediaDevices.getDisplayMedia = async function(...args) {
+            // We show the blackout effect *before* prompting the user for permission.
             handleRecordingStart();
-            
+
             try {
                 const stream = await originalGetDisplayMedia.apply(this, args);
+                // If the user approves, we listen for when they stop sharing.
                 stream.getTracks().forEach(track => {
                     track.onended = handleRecordingStop;
                 });
                 return stream;
             } catch (err) {
-                // User cancelled the prompt
+                // If the user cancels the prompt, we remove the blackout effect.
                 handleRecordingStop();
                 throw err;
             }
