@@ -8,6 +8,13 @@
     position: relative;
     display: inline-block;
     overflow: hidden; /* Contain the watermark pattern */
+    /* Make the wrapper itself ignore clicks, so they pass through to the video */
+    pointer-events: none;
+}
+
+/* Re-enable pointer events on the video element itself so it can be controlled */
+.bcp-watermark-wrapper > video {
+    pointer-events: auto;
 }
 
 .bcp-watermark, .bcp-watermark-pattern-span {
