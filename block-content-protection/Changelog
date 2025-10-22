@@ -2,6 +2,15 @@
 
 All notable changes to Block Content Protection will be documented in this file.
 
+## [1.5.7] - 2025-10-22
+
+### Fixed
+- **Video Controls**: Addressed an issue where the overlay used to block download managers was also covering the video's control bar, disabling the volume and fullscreen buttons. The overlay's height has been adjusted to keep the controls accessible.
+- **Download Manager Blocking**: Improved the effectiveness of the download manager block by increasing the z-index of the overlay, ensuring it sits on top of any download manager buttons.
+- **Screen Recording Block**: Re-implemented the screen recording block to fix a bug that caused the video to be blacked out at all times. The feature now uses a more reliable CSS-based approach.
+
+---
+
 ## [1.5.6] - 2025-10-21
 
 ### Fixed
