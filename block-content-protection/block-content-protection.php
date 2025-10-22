@@ -3,7 +3,7 @@
  * Plugin Name:       Block Content Protection
  * Description:       A comprehensive plugin to protect website content. Blocks screenshots, screen recording, right-click, developer tools, and more.
  * Plugin URI:        https://adschi.com/
- * Version:           1.6.1
+ * Version:           1.6.2
  * Author:            Mohammad Babaei
  * Author URI:        https://adschi.com/
  * License:           GPL-2.0+
@@ -148,42 +148,55 @@ function bcp_render_textfield_field( $args ) {
 }
 
 function bcp_sanitize_options( $input ) {
-    $sanitized_input = [];
-    if ( ! is_array( $input ) ) {
-        return $sanitized_input;
-    }
+    // Initialize a new array to store the sanitized values.
+    $new_options = [];
 
-    $checkboxes = [ 'disable_right_click', 'disable_devtools', 'disable_copy', 'disable_text_selection', 'disable_image_drag', 'disable_video_download', 'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block', 'video_screen_record_block', 'enable_video_watermark', 'enable_page_watermark', 'enable_custom_messages' ];
+    // Ensure the input is an array, even if no settings are submitted.
+    $input = is_array( $input ) ? $input : [];
+
+    // Define all known checkbox fields.
+    $checkboxes = [
+        'disable_right_click', 'disable_devtools', 'disable_copy',
+        'disable_text_selection', 'disable_image_drag', 'disable_video_download',
+        'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block',
+        'video_screen_record_block', 'enable_video_watermark', 'enable_page_watermark',
+        'enable_custom_messages'
+    ];
+
+    // For each checkbox, if it was submitted (checked), set to 1. Otherwise (unchecked), set to 0.
     foreach ( $checkboxes as $field ) {
-        $sanitized_input[$field] = ! empty( $input[$field] ) ? 1 : 0;
+        $new_options[$field] = ! empty( $input[$field] ) ? 1 : 0;
     }
 
+    // Sanitize text and textarea fields.
     if ( isset( $input['whitelisted_ips'] ) ) {
-        $sanitized_input['whitelisted_ips'] = implode( "\n", array_map( 'sanitize_text_field', explode( "\n", $input['whitelisted_ips'] ) ) );
+        $new_options['whitelisted_ips'] = implode( "\n", array_map( 'sanitize_text_field', explode( "\n", $input['whitelisted_ips'] ) ) );
     }
     if ( isset( $input['excluded_pages'] ) ) {
-        $sanitized_input['excluded_pages'] = sanitize_text_field( $input['excluded_pages'] );
+        $new_options['excluded_pages'] = sanitize_text_field( $input['excluded_pages'] );
     }
     if ( isset( $input['screenshot_alert_message'] ) ) {
-        $sanitized_input['screenshot_alert_message'] = sanitize_text_field( $input['screenshot_alert_message'] );
+        $new_options['screenshot_alert_message'] = sanitize_text_field( $input['screenshot_alert_message'] );
     }
     if ( isset( $input['recording_alert_message'] ) ) {
-        $sanitized_input['recording_alert_message'] = sanitize_text_field( $input['recording_alert_message'] );
+        $new_options['recording_alert_message'] = sanitize_text_field( $input['recording_alert_message'] );
     }
     if ( isset( $input['watermark_text'] ) ) {
-        $sanitized_input['watermark_text'] = sanitize_text_field( $input['watermark_text'] );
-    }
-    if ( isset( $input['watermark_opacity'] ) ) {
-        $sanitized_input['watermark_opacity'] = floatval( $input['watermark_opacity'] );
-    }
-    if ( isset( $input['watermark_position'] ) ) {
-        $sanitized_input['watermark_position'] = sanitize_key( $input['watermark_position'] );
-    }
-    if ( isset( $input['watermark_style'] ) ) {
-        $sanitized_input['watermark_style'] = sanitize_key( $input['watermark_style'] );
+        $new_options['watermark_text'] = sanitize_text_field( $input['watermark_text'] );
     }
 
-    return $sanitized_input;
+    // Sanitize number and select fields.
+    if ( isset( $input['watermark_opacity'] ) ) {
+        $new_options['watermark_opacity'] = floatval( $input['watermark_opacity'] );
+    }
+    if ( isset( $input['watermark_position'] ) ) {
+        $new_options['watermark_position'] = sanitize_key( $input['watermark_position'] );
+    }
+    if ( isset( $input['watermark_style'] ) ) {
+        $new_options['watermark_style'] = sanitize_key( $input['watermark_style'] );
+    }
+
+    return $new_options;
 }
 
 function bcp_options_page() {
@@ -354,11 +367,11 @@ function bcp_enqueue_scripts() {
             $options['watermark_text'] = str_replace( array_keys( $replacements ), array_values( $replacements ), $options['watermark_text'] );
         }
 
-        wp_enqueue_script( 'bcp-protect', BCP_PLUGIN_URL . 'js/protect.js', [], '1.6.1', true );
+        wp_enqueue_script( 'bcp-protect', BCP_PLUGIN_URL . 'js/protect.js', [], '1.6.2', true );
         wp_localize_script( 'bcp-protect', 'bcp_settings', $options );
 
         if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) || ! empty( $options['enable_page_watermark'] ) ) {
-            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.1' );
+            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.2' );
         }
     }
 }
