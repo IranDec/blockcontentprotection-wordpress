@@ -215,9 +215,19 @@
             // Screenshot
             if (bcp_settings.disable_screenshot && (e.key === 'PrintScreen' || (ctrl && e.shiftKey && ['3', '4', 'S'].includes(key)))) {
                 e.preventDefault();
+
+                // Apply blackout effect
+                document.body.classList.add('bcp-screenshot-detected');
+
+                // Show alert if enabled
                 if (bcp_settings.enable_custom_messages && bcp_settings.screenshot_alert_message) {
                     alert(bcp_settings.screenshot_alert_message);
                 }
+
+                // Remove blackout effect after a short delay
+                setTimeout(() => {
+                    document.body.classList.remove('bcp-screenshot-detected');
+                }, 1000); // 1 second delay
             }
         });
     }
