@@ -34,8 +34,12 @@
         if (bcp_settings.disable_video_download) {
             const originalSrc = video.getAttribute('src') || (video.querySelector('source') ? video.querySelector('source').getAttribute('src') : null);
             if (originalSrc && !originalSrc.startsWith('blob:')) {
+                // Immediately pause, clear sources, and call load() to stop the browser's original fetch.
+                // This is a more robust way to prevent download managers from latching onto the initial src.
+                video.pause();
                 video.removeAttribute('src');
-                video.querySelectorAll('source').forEach(s => s.removeAttribute('src'));
+                video.querySelectorAll('source').forEach(s => s.remove());
+                video.load();
 
                 fetch(originalSrc, { credentials: 'omit' })
                     .then(response => {
@@ -199,18 +203,22 @@
 
         // We override the native getDisplayMedia function to hook into the screen sharing process.
         navigator.mediaDevices.getDisplayMedia = async function(...args) {
-            // We show the blackout effect *before* prompting the user for permission.
-            handleRecordingStart();
-
+            // This logic is corrected to only apply the blackout effect *after* the
+            // user has given permission to record the screen.
             try {
                 const stream = await originalGetDisplayMedia.apply(this, args);
-                // If the user approves, we listen for when they stop sharing.
+
+                // If the promise resolves, the user has started sharing. Now, we apply the block.
+                handleRecordingStart();
+
+                // When the user stops sharing, remove the block.
                 stream.getTracks().forEach(track => {
                     track.onended = handleRecordingStop;
                 });
                 return stream;
             } catch (err) {
-                // If the user cancels the prompt, we remove the blackout effect.
+                // If the promise rejects, the user cancelled the prompt.
+                // We ensure the block is removed in case it was somehow applied.
                 handleRecordingStop();
                 throw err;
             }

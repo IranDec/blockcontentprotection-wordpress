@@ -2,6 +2,11 @@
 
 All notable changes to Block Content Protection will be documented in this file.
 
+## [1.5.9] - 2025-10-22
+
+### Fixed
+- **Video Controls**: Restored full functionality to the video player's native controls (volume, fullscreen, etc.) by removing the `bcp-click-handler` overlay and applying the correct CSS `pointer-events` properties to the watermark wrapper, ensuring all clicks are passed through to the video player.
+
 ## [1.5.8] - 2025-10-22
 
 ### Fixed
