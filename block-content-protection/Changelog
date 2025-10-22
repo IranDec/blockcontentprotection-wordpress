@@ -2,6 +2,12 @@
 
 All notable changes to Block Content Protection will be documented in this file.
 
+## [1.6.4] - 2025-10-22
+
+### Changed
+- **JavaScript Module**: Refactored the main `protect.js` script to be a modern JavaScript module, improving code structure and maintainability.
+- **Full-Page Watermark**: The full-page watermark feature has been disabled and commented out from the plugin. The video-specific watermark remains functional.
+
 ## [1.6.2] - 2025-10-22
 
 ### Fixed
