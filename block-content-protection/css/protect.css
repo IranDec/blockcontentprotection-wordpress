@@ -18,6 +18,7 @@
 }
 
 /* --- Full Page Watermark Container --- */
+/*
 .bcp-page-watermark-container {
     position: fixed;
     top: 0;
@@ -28,6 +29,7 @@
     z-index: 999998; /* High z-index but below screenshot blackout */
     overflow: hidden;
 }
+*/
 
 .bcp-watermark, .bcp-watermark-pattern-span {
     position: absolute;

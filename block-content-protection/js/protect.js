@@ -1,8 +1,8 @@
-(() => {
-    // Exit if settings are not defined
-    if (typeof bcp_settings === 'undefined') {
-        return;
-    }
+// Exit if settings are not defined
+if (typeof bcp_settings === 'undefined') {
+    // We don't return here in a module, but the rest of the script won't run.
+    console.error("BCP Error: bcp_settings object not found.");
+} else {
 
     const processedVideos = new WeakSet();
 
@@ -104,6 +104,7 @@
 
 
     // --- Page Watermark ---
+    /*
     const applyPageWatermark = () => {
         if (!bcp_settings.enable_page_watermark || !bcp_settings.watermark_text || bcp_settings.watermark_text.length === 0) {
             return;
@@ -139,6 +140,7 @@
 
         document.body.appendChild(watermarkContainer);
     };
+    */
 
     // --- Initialization and Observation ---
     const initProtection = () => {
@@ -154,7 +156,7 @@
         }
 
         // Apply the full-page watermark
-        applyPageWatermark();
+        // applyPageWatermark();
     };
 
     // Use MutationObserver to protect dynamically added videos
@@ -283,5 +285,4 @@
             }
         };
     }
-
-})();
+}
