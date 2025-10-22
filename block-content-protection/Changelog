@@ -2,6 +2,11 @@
 
 All notable changes to Block Content Protection will be documented in this file.
 
+## [1.6.2] - 2025-10-22
+
+### Fixed
+- **Settings**: Corrected a bug where disabling a feature via its checkbox was not being saved correctly, causing the feature to remain active. The settings sanitization function has been refactored for improved reliability.
+
 ## [1.6.1] - 2025-10-22
 
 ### Fixed
