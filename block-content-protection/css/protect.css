@@ -17,6 +17,18 @@
     pointer-events: auto;
 }
 
+/* --- Full Page Watermark Container --- */
+.bcp-page-watermark-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 999998; /* High z-index but below screenshot blackout */
+    overflow: hidden;
+}
+
 .bcp-watermark, .bcp-watermark-pattern-span {
     position: absolute;
     color: rgba(255, 255, 255, 0.5);
@@ -87,4 +99,22 @@
 /* When screen recording is detected, we apply this class to the video wrapper. */
 .bcp-recording-detected > video {
     filter: brightness(0) !important;
+}
+
+/*
+  Screenshot Protection:
+  This media query targets the screen when a screen capture is active.
+  We create a pseudo-element that covers the entire body and blacks it out.
+*/
+@media (display-capture: monitor) {
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: black;
+        z-index: 999999;
+    }
 }

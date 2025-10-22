@@ -26,7 +26,7 @@
             wrapper.appendChild(video);
         }
 
-        if (bcp_settings.enable_watermark && bcp_settings.watermark_text && bcp_settings.watermark_text.length > 0) {
+        if (bcp_settings.enable_video_watermark && bcp_settings.watermark_text && bcp_settings.watermark_text.length > 0) {
             applyWatermark(wrapper, video);
         }
 
@@ -103,6 +103,43 @@
     };
 
 
+    // --- Page Watermark ---
+    const applyPageWatermark = () => {
+        if (!bcp_settings.enable_page_watermark || !bcp_settings.watermark_text || bcp_settings.watermark_text.length === 0) {
+            return;
+        }
+
+        if (document.querySelector('.bcp-page-watermark-container')) {
+            return; // Already exists
+        }
+
+        const watermarkContainer = document.createElement('div');
+        watermarkContainer.classList.add('bcp-page-watermark-container');
+
+        const opacity = parseFloat(bcp_settings.watermark_opacity) || 0.5;
+        const style = bcp_settings.watermark_style || 'text';
+        const text = bcp_settings.watermark_text;
+
+        watermarkContainer.style.opacity = opacity;
+
+        if (style === 'pattern') {
+            watermarkContainer.classList.add('bcp-wm-style-pattern');
+            for (let i = 0; i < 150; i++) { // More spans to cover the page
+                const span = document.createElement('span');
+                span.classList.add('bcp-watermark-pattern-span');
+                span.textContent = text;
+                watermarkContainer.appendChild(span);
+            }
+        } else { // 'text' style
+            const watermark = document.createElement('div');
+            watermark.classList.add('bcp-watermark', 'bcp-wm-style-text', 'bcp-wm-position-animated');
+            watermark.textContent = bcp_settings.watermark_text;
+            watermarkContainer.appendChild(watermark);
+        }
+
+        document.body.appendChild(watermarkContainer);
+    };
+
     // --- Initialization and Observation ---
     const initProtection = () => {
         // Apply protection to all existing video elements
@@ -115,6 +152,9 @@
         if (bcp_settings.enhanced_protection) {
             document.body.classList.add('bcp-enhanced-protection');
         }
+
+        // Apply the full-page watermark
+        applyPageWatermark();
     };
 
     // Use MutationObserver to protect dynamically added videos
