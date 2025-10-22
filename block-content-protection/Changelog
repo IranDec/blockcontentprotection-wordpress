@@ -2,6 +2,18 @@
 
 All notable changes to Block Content Protection will be documented in this file.
 
+## [1.6.0] - 2025-10-22
+
+### Added
+- **Full Page Watermark**: Implemented a new, optional full-page dynamic watermark to deter screen recording and screenshots. This can be configured in the settings.
+- **CSS Screenshot Blackout**: Added a CSS-based feature using `@media (display-capture: monitor)` to black out the screen when a browser-based screen capture is detected.
+
+### Changed
+- **Watermark Settings**: Refactored the watermark settings to distinguish between the existing video watermark and the new full-page watermark.
+
+### Fixed
+- **Watermark Functionality**: Corrected a bug where the watermark settings were not being correctly applied due to a mismatch between the PHP and JavaScript code.
+
 ## [1.5.9] - 2025-10-22
 
 ### Fixed
@@ -172,12 +184,6 @@ All notable changes to Block Content Protection will be documented in this file.
 - Advanced DRM-like protection
 - Activity logging and reporting
 - Admin notifications for protection violations
-
-**v1.6.0** (Planned)
-- Machine learning-based detection
-- Advanced encryption for sensitive content
-- Multi-language support improvements
-- Performance optimizations
 
 ---
 
