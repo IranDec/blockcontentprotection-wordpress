@@ -201,8 +201,17 @@
         }, false);
     }
 
-    // Keyboard Shortcuts (DevTools & Screenshot)
+    // Keyboard Shortcuts (DevTools & Screenshot) & Blackout on Focus Loss
     if (bcp_settings.disable_devtools || bcp_settings.disable_screenshot) {
+        if (bcp_settings.disable_screenshot) {
+            window.addEventListener('blur', () => {
+                document.body.classList.add('bcp-screenshot-detected');
+            });
+            window.addEventListener('focus', () => {
+                document.body.classList.remove('bcp-screenshot-detected');
+            });
+        }
+
         document.addEventListener('keydown', e => {
             const key = e.key.toUpperCase();
             const ctrl = e.ctrlKey || e.metaKey;
