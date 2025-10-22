@@ -118,3 +118,19 @@
         z-index: 999999;
     }
 }
+
+/*
+  Screenshot Blackout Effect:
+  This class is added to the body via JavaScript when a screenshot
+  shortcut is detected, creating a black overlay to ruin the screenshot.
+*/
+body.bcp-screenshot-detected::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: black;
+    z-index: 9999999;
+}
