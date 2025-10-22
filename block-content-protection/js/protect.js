@@ -30,20 +30,6 @@
             applyWatermark(wrapper, video);
         }
 
-        // Add a transparent overlay to block IDM and other downloaders
-        const overlay = document.createElement('div');
-        overlay.classList.add('bcp-click-overlay');
-        wrapper.appendChild(overlay);
-
-        // Add click listener to the overlay to control the video
-        overlay.addEventListener('click', () => {
-            if (video.paused) {
-                video.play();
-            } else {
-                video.pause();
-            }
-        });
-
         // B. Improved Download Protection (Blob URL)
         if (bcp_settings.disable_video_download) {
             const originalSrc = video.getAttribute('src') || (video.querySelector('source') ? video.querySelector('source').getAttribute('src') : null);
