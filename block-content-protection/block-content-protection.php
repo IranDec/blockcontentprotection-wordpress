@@ -79,7 +79,7 @@ function bcp_register_settings() {
     // Watermark Section
     add_settings_section( 'bcp_watermark_section', null, null, 'block_content_protection' );
     add_settings_field( 'enable_video_watermark', __( 'Enable Video Watermark', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'enable_video_watermark', 'description' => __( 'Enable this to show a dynamic watermark over videos.', 'block-content-protection' ) ] );
-    add_settings_field( 'enable_page_watermark', __( 'Enable Full Page Watermark', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'enable_page_watermark', 'description' => __( 'Enable this to show a dynamic watermark over the entire page.', 'block-content-protection' ) ] );
+    // add_settings_field( 'enable_page_watermark', __( 'Enable Full Page Watermark', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'enable_page_watermark', 'description' => __( 'Enable this to show a dynamic watermark over the entire page.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_text', __( 'Watermark Text', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_text', 'description' => __( 'Enter text for the watermark. Use placeholders: {user_login}, {user_email}, {user_mobile}, {ip_address}, {date}.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_opacity', __( 'Watermark Opacity', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_opacity', 'description' => __( 'Set the opacity from 0 (transparent) to 1 (opaque). Default: 0.5', 'block-content-protection' ), 'min' => 0, 'max' => 1, 'step' => '0.1' ] );
     add_settings_field( 'watermark_position', __( 'Watermark Position', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_position', 'description' => __( 'Select the watermark position.', 'block-content-protection' ), 'options' => [ 'animated' => 'Animated', 'top_left' => 'Top Left', 'top_right' => 'Top Right', 'bottom_left' => 'Bottom Left', 'bottom_right' => 'Bottom Right', ] ] );
@@ -159,7 +159,7 @@ function bcp_sanitize_options( $input ) {
         'disable_right_click', 'disable_devtools', 'disable_copy',
         'disable_text_selection', 'disable_image_drag', 'disable_video_download',
         'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block',
-        'video_screen_record_block', 'enable_video_watermark', 'enable_page_watermark',
+        'video_screen_record_block', 'enable_video_watermark', //'enable_page_watermark',
         'enable_custom_messages'
     ];
 
@@ -340,9 +340,9 @@ function bcp_enqueue_scripts() {
         }
     }
 
-    if ( $is_protection_enabled || ! empty( $options['enable_video_watermark'] ) || ! empty( $options['enable_page_watermark'] ) ) {
+    if ( $is_protection_enabled || ! empty( $options['enable_video_watermark'] ) /*|| ! empty( $options['enable_page_watermark'] )*/ ) {
         // Replace watermark placeholders
-        if ( ( ! empty( $options['enable_video_watermark'] ) || ! empty( $options['enable_page_watermark'] ) ) && ! empty( $options['watermark_text'] ) ) {
+        if ( ( ! empty( $options['enable_video_watermark'] ) /*|| ! empty( $options['enable_page_watermark'] )*/ ) && ! empty( $options['watermark_text'] ) ) {
             $current_user = wp_get_current_user();
             $ip_address = bcp_get_user_ip();
             $date = date( get_option( 'date_format' ) );
@@ -367,15 +367,23 @@ function bcp_enqueue_scripts() {
             $options['watermark_text'] = str_replace( array_keys( $replacements ), array_values( $replacements ), $options['watermark_text'] );
         }
 
-        wp_enqueue_script( 'bcp-protect', BCP_PLUGIN_URL . 'js/protect.js', [], '1.6.2', true );
+        wp_enqueue_script( 'bcp-protect', BCP_PLUGIN_URL . 'js/protect.js', [], '1.6.2' );
         wp_localize_script( 'bcp-protect', 'bcp_settings', $options );
 
-        if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) || ! empty( $options['enable_page_watermark'] ) ) {
+        if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) /*|| ! empty( $options['enable_page_watermark'] )*/ ) {
             wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.2' );
         }
     }
 }
 add_action( 'wp_enqueue_scripts', 'bcp_enqueue_scripts' );
+
+function bcp_add_module_to_script( $tag, $handle, $src ) {
+    if ( 'bcp-protect' === $handle ) {
+        $tag = '<script type="module" src="' . esc_url( $src ) . '" id="' . esc_attr( $handle ) . '-js"></script>';
+    }
+    return $tag;
+}
+add_filter( 'script_loader_tag', 'bcp_add_module_to_script', 10, 3 );
 
 function bcp_enqueue_admin_scripts( $hook ) {
     // Only load on our plugin's settings page
@@ -421,7 +429,7 @@ function bcp_activation() {
         'enable_custom_messages'    => 0,
         'watermark_text'            => '',
         'enable_video_watermark'    => 0,
-        'enable_page_watermark'     => 0,
+        //'enable_page_watermark'     => 0,
         'watermark_opacity'         => 0.5,
         'watermark_position'        => 'animated',
         'watermark_style'           => 'text',
