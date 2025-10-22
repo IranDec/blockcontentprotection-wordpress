@@ -6,12 +6,12 @@ A comprehensive content protection plugin for WordPress, designed to prevent con
 
 ---
 
-## 🆕 New in Version 1.4.0
+## 🆕 New in Version 1.6.4
 
-- **Mobile Screenshot Blocking**: Attempts to block screenshots on mobile devices (Android)
-- **Video Screen Recording Protection**: When screen recording is detected, videos turn black
-- **Enhanced Detection**: Multiple methods to detect and prevent screen capture
-- **Custom Alerts**: Separate alert messages for screenshots and recording attempts
+- **Improved Screenshot Blocking**: Enhanced protection against OS-level tools like the Windows Snipping Tool.
+- **Critical Bug Fix**: Resolved an issue where settings could not be disabled once enabled.
+- **Code Modernization**: The frontend script has been converted to a modern JavaScript module.
+- **Feature Removal**: The full-page watermark feature has been removed to simplify the plugin.
 
 ---
 
@@ -32,6 +32,7 @@ This plugin provides a robust set of features to protect your website's content:
 -   **Mobile Screenshot Block**: Attempts to prevent screenshots on mobile devices using multiple techniques.
 -   **Video Screen Recording Block**: Detects screen recording and turns videos black to protect content.
 -   **Enhanced Screen Protection**: Adds protective CSS layers and detection mechanisms.
+-   **Video Watermark**: Apply a dynamic, animated watermark over your videos.
 
 ### Customization
 -   **IP Whitelist**: Exclude specific IP addresses from all protections.
@@ -97,22 +98,16 @@ For maximum protection, enable:
 ## How It Works
 
 ### Screenshot Protection
-1. **Keyboard Blocking**: Intercepts PrintScreen and screenshot shortcuts
-2. **Mobile Detection**: Monitors touch gestures and visibility changes
-3. **Blur Effect**: Applies blur when screen capture is suspected
-4. **Alert System**: Warns users that screenshots are disabled
+1. **Event-Based Blocking**: Intercepts keyboard shortcuts (PrintScreen) and window focus loss (`blur` event) to trigger a blackout effect, countering OS-level tools.
+2. **Mobile Detection**: Monitors touch gestures and visibility changes.
+3. **Blackout Effect**: Applies a full-screen black overlay to obscure content when screen capture is suspected.
+4. **Alert System**: Warns users that screenshots are disabled.
 
 ### Video Protection
-1. **Recording Detection**: Monitors for screen recording APIs
-2. **Black Screen**: Applies filter to turn videos black when recording detected
-3. **Continuous Monitoring**: Checks for recording throughout playback
-4. **Multiple Layers**: Uses CSS filters and JavaScript detection
-
-### Additional Security
-- **DevTools Detection**: Monitors browser size changes to detect DevTools
-- **Iframe Protection**: Prevents embedding in other sites
-- **Print Blocking**: Disables printing via CSS
-- **Clipboard Clearing**: Attempts to clear clipboard after screenshot attempts
+1. **Recording Detection**: Monitors for screen recording APIs (`getDisplayMedia`).
+2. **Black Screen**: Applies a filter to turn videos black when recording is detected.
+3. **Continuous Monitoring**: Checks for recording throughout playback.
+4. **Multiple Layers**: Uses CSS filters and JavaScript detection.
 
 ---
 
@@ -163,7 +158,7 @@ block-content-protection/
 
 For support, bug reports, or feature requests:
 - Visit: [adschi.com](https://adschi.com)
-- Version: 1.4.0
+- Version: 1.6.4
 - Last Updated: 2025
 
 ---
@@ -185,12 +180,12 @@ Copyright (c) 2025 Mohammad Babaei
 
 ---
 
-## 🆕 جدید در نسخه 1.4.0
+## 🆕 جدید در نسخه ۱.۶.۴
 
-- **مسدود کردن اسکرین‌شات موبایل**: تلاش برای جلوگیری از اسکرین‌شات در دستگاه‌های موبایل (اندروید)
-- **محافظت ویدئو از ضبط صفحه**: هنگام تشخیص ضبط صفحه، ویدئوها سیاه می‌شوند
-- **تشخیص پیشرفته**: روش‌های متعدد برای شناسایی و جلوگیری از ضبط صفحه
-- **هشدارهای سفارشی**: پیام‌های جداگانه برای اسکرین‌شات و تلاش برای ضبط
+- **بهبود مسدودسازی اسکرین‌شات**: محافظت پیشرفته در برابر ابزارهای سیستمی مانند Snipping Tool ویندوز.
+- **رفع باگ حیاتی**: حل مشکلی که در آن تنظیمات پس از فعال‌سازی، غیرفعال نمی‌شدند.
+- **مدرن‌سازی کد**: اسکریپت فرانت‌اند به یک ماژول جاوااسکریپت مدرن تبدیل شده است.
+- **حذف ویژگی**: قابلیت واترمارک تمام صفحه برای ساده‌سازی افزونه حذف شده است.
 
 ---
 
@@ -211,6 +206,7 @@ Copyright (c) 2025 Mohammad Babaei
 -   **مسدود کردن اسکرین‌شات موبایل**: تلاش برای جلوگیری از اسکرین‌شات با روش‌های متعدد
 -   **محافظت ویدئو از ضبط صفحه**: تشخیص ضبط صفحه و سیاه کردن ویدئوها
 -   **محافظت پیشرفته صفحه**: افزودن لایه‌های محافظ CSS و مکانیزم‌های تشخیص
+-   **واترمارک ویدئو**: اعمال یک واترمارک متحرک و داینامیک بر روی ویدئوهای شما.
 
 ### سفارشی‌سازی
 -   **لیست سفید IP**: حذف آدرس‌های IP خاص از تمام محافظت‌ها
@@ -276,22 +272,16 @@ Copyright (c) 2025 Mohammad Babaei
 ## نحوه کار
 
 ### محافظت اسکرین‌شات
-1. **مسدود کردن صفحه‌کلید**: رهگیری PrintScreen و میانبرهای اسکرین‌شات
+1. **مسدودسازی مبتنی بر رویداد**: با رهگیری میانبرهای صفحه‌کلید و از دست دادن فوکوس پنجره، یک افکت سیاه را برای مقابله با ابزارهای سیستمی فعال می‌کند.
 2. **تشخیص موبایل**: نظارت بر حرکات لمسی و تغییرات دید
-3. **افکت بلور**: اعمال بلور هنگام شک به ضبط صفحه
+3. **افکت سیاه**: اعمال یک پوشش سیاه تمام‌صفحه برای مخفی کردن محتوا هنگام شک به ضبط صفحه
 4. **سیستم هشدار**: هشدار به کاربران که اسکرین‌شات غیرفعال است
 
 ### محافظت ویدئو
-1. **تشخیص ضبط**: نظارت بر APIهای ضبط صفحه
+1. **تشخیص ضبط**: نظارت بر APIهای ضبط صفحه (`getDisplayMedia`)
 2. **صفحه سیاه**: اعمال فیلتر برای سیاه کردن ویدئوها هنگام تشخیص ضبط
 3. **نظارت مداوم**: بررسی ضبط در طول پخش
 4. **لایه‌های متعدد**: استفاده از فیلترهای CSS و تشخیص JavaScript
-
-### امنیت اضافی
-- **تشخیص DevTools**: نظارت بر تغییرات اندازه مرورگر
-- **محافظت Iframe**: جلوگیری از جاسازی در سایت‌های دیگر
-- **مسدود کردن پرینت**: غیرفعال کردن چاپ از طریق CSS
-- **پاک کردن کلیپ‌بورد**: تلاش برای پاک کردن کلیپ‌بورد پس از تلاش برای اسکرین‌شات
 
 ---
 
@@ -299,7 +289,7 @@ Copyright (c) 2025 Mohammad Babaei
 
 برای پشتیبانی، گزارش باگ یا درخواست ویژگی:
 - وب‌سایت: [adschi.com](https://adschi.com)
-- نسخه: 1.4.0
+- نسخه: 1.6.4
 - آخرین به‌روزرسانی: ۲۰۲۵
 
 ---
