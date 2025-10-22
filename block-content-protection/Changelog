@@ -2,6 +2,11 @@
 
 All notable changes to Block Content Protection will be documented in this file.
 
+## [1.6.1] - 2025-10-22
+
+### Fixed
+- **Screenshot Blocking**: Implemented a more reliable screenshot blocking mechanism by triggering a blackout effect when the browser window loses focus. This more effectively prevents screenshots from OS-level tools like the Windows Snipping Tool (`Win+Shift+S`).
+
 ## [1.6.0] - 2025-10-22
 
 ### Added
