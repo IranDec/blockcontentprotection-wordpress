@@ -81,14 +81,3 @@
 .bcp-recording-detected > video {
     filter: brightness(0) !important;
 }
-
-/* Click overlay for download manager blocking */
-.bcp-click-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: calc(100% - 40px); /* Avoid covering the controls */
-    z-index: 99999; /* High z-index to cover download manager buttons */
-    background: transparent;
-}
