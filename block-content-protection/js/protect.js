@@ -102,6 +102,32 @@ if (typeof bcp_settings === 'undefined') {
         }
     };
 
+    // --- Fullscreen Watermark Handling ---
+    const handleFullscreenChange = () => {
+        const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+        const wrapper = fullscreenElement ? fullscreenElement.closest('.bcp-watermark-wrapper') : null;
+
+        // Remove any existing fullscreen watermarks
+        document.querySelectorAll('.bcp-fullscreen-watermark').forEach(wm => wm.remove());
+
+        if (fullscreenElement && wrapper && bcp_settings.enable_video_watermark) {
+            const watermark = document.createElement('div');
+            watermark.className = 'bcp-watermark bcp-fullscreen-watermark'; // Use a specific class
+            watermark.textContent = bcp_settings.watermark_text;
+            watermark.style.opacity = parseFloat(bcp_settings.watermark_opacity) || 0.5;
+
+            // Apply animation or static position based on settings
+            if (bcp_settings.watermark_position === 'animated') {
+                watermark.classList.add('bcp-wm-position-animated');
+            } else {
+                watermark.classList.add(`bcp-wm-position-${bcp_settings.watermark_position}`);
+            }
+
+            // Append to the wrapper, which is the container in fullscreen
+            wrapper.appendChild(watermark);
+        }
+    };
+
 
     // --- Page Watermark ---
     /*
@@ -185,6 +211,11 @@ if (typeof bcp_settings === 'undefined') {
 
 
     // --- Event-based Protections ---
+
+    // Fullscreen change events
+    ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(event => {
+        document.addEventListener(event, handleFullscreenChange, false);
+    });
 
     // Right Click
     if (bcp_settings.disable_right_click) {

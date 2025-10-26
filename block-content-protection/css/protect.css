@@ -17,6 +17,23 @@
     pointer-events: auto;
 }
 
+/* Ensure the wrapper fills the screen in fullscreen mode */
+.bcp-watermark-wrapper:fullscreen {
+    width: 100%;
+    height: 100%;
+}
+
+/* Make sure the video also fills the screen inside the fullscreen wrapper */
+.bcp-watermark-wrapper:fullscreen > video {
+    width: 100%;
+    height: 100%;
+}
+
+/* Z-index for the specific fullscreen watermark to ensure it's on top */
+.bcp-fullscreen-watermark {
+    z-index: 2147483647 !important; /* Max z-index */
+}
+
 /* --- Full Page Watermark Container --- */
 /*
 .bcp-page-watermark-container {
@@ -52,6 +69,9 @@
 
 /* --- Watermark Styles --- */
 .bcp-wm-style-text.bcp-wm-position-animated {
+    /* Set an initial position */
+    top: 10px;
+    left: 10px;
     animation: bcp-watermark-move 15s infinite alternate ease-in-out;
 }
 
@@ -81,11 +101,26 @@
 
 /* --- Animations --- */
 @keyframes bcp-watermark-move {
-    0% { transform: translate(5px, 5px); }
-    25% { transform: translate(calc(100% - 105%), 5px); } /* Stay top-left-ish */
-    50% { transform: translate(calc(100% - 105%), calc(100% - 105%)); } /* Move bottom-left-ish */
-    75% { transform: translate(5px, calc(100% - 105%)); } /* Move bottom-right-ish */
-    100% { transform: translate(5px, 5px); } /* Return to start */
+    0% {
+        top: 10px;
+        left: 10px;
+    }
+    25% {
+        top: 10px;
+        left: calc(100% - 110px); /* Adjust for watermark width */
+    }
+    50% {
+        top: calc(100% - 40px); /* Adjust for watermark height */
+        left: calc(100% - 110px);
+    }
+    75% {
+        top: calc(100% - 40px);
+        left: 10px;
+    }
+    100% {
+        top: 10px;
+        left: 10px;
+    }
 }
 
 
