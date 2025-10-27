@@ -369,14 +369,12 @@ function bcp_enqueue_scripts() {
 
         // Enqueue the new module script
         wp_enqueue_script( 'bcp-protect-module', BCP_PLUGIN_URL . 'js/protect.module.js', [], '1.6.6', true );
-        wp_localize_script( 'bcp-protect-module', 'bcp_settings', $options );
 
-        // Add an inline script to call the init function from the module
-        wp_add_inline_script(
-            'bcp-protect-module',
-            'import { init } from "' . esc_url( BCP_PLUGIN_URL . 'js/protect.module.js' ) . '"; init();',
-            'after'
-        );
+        // Create a data bridge for the module
+        add_action('wp_footer', function() use ($options) {
+            echo '<script type="application/json" id="bcp-settings-data">' . wp_json_encode($options) . '</script>';
+        }, 99);
+
 
         // Enqueue styles if needed
         if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) ) {
@@ -387,9 +385,8 @@ function bcp_enqueue_scripts() {
 add_action( 'wp_enqueue_scripts', 'bcp_enqueue_scripts' );
 
 function bcp_add_module_to_script( $tag, $handle, $src ) {
-    // Ensure the main module script is loaded with type="module"
     if ( 'bcp-protect-module' === $handle ) {
-        // The inline script will handle the import, so the main script tag is just for loading.
+        // Since the module is self-executing, we just need to add type="module"
         $tag = '<script type="module" src="' . esc_url( $src ) . '" id="' . esc_attr( $handle ) . '-js"></script>';
     }
     return $tag;
