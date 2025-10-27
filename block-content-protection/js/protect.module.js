@@ -1,7 +1,17 @@
-// Ensure the settings object is available
-if (typeof bcp_settings === 'undefined') {
-    throw new Error("BCP Error: The bcp_settings object is not defined.");
+// --- Settings Initialization ---
+let bcp_settings = {};
+const settingsElement = document.getElementById('bcp-settings-data');
+
+if (settingsElement) {
+    try {
+        bcp_settings = JSON.parse(settingsElement.textContent);
+    } catch (e) {
+        console.error("BCP Error: Could not parse settings data.", e);
+    }
+} else {
+    console.error("BCP Error: Settings data element not found.");
 }
+
 
 const processedVideos = new WeakSet();
 
@@ -177,8 +187,8 @@ const observer = new MutationObserver(mutations => {
     });
 });
 
-// --- Public API ---
-export function init() {
+// --- Self-Executing Initialization ---
+const BCP_Init = () => {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initProtection);
     } else {
@@ -202,4 +212,7 @@ export function init() {
     }
 
     handleScreenRecording();
-}
+};
+
+// Run the initialization
+BCP_Init();
