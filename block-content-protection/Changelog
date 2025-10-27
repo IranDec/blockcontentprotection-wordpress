@@ -2,6 +2,14 @@
 
 All notable changes to Block Content Protection will be documented in this file.
 
+## [1.6.6] - 2025-10-27
+
+### Fixed
+- **Fullscreen Watermark**: Reworked the fullscreen watermark logic to ensure it correctly appears and resizes when a video enters fullscreen mode.
+  - The watermark is now appended directly to the fullscreen element, ensuring it remains visible.
+  - A `ResizeObserver` has been added to dynamically adjust the watermark's font size based on the video's dimensions, improving visibility on all screen sizes.
+  - The CSS has been updated to use `position: fixed`, ensuring the watermark properly overlays the fullscreen video.
+
 ## [1.6.4] - 2025-10-22
 
 ### Changed

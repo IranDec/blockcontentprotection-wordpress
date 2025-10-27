@@ -31,7 +31,9 @@
 
 /* Z-index for the specific fullscreen watermark to ensure it's on top */
 .bcp-fullscreen-watermark {
+    position: fixed; /* Use fixed positioning to overlay the entire screen */
     z-index: 2147483647 !important; /* Max z-index */
+    /* Animation keyframes will handle the positioning */
 }
 
 /* --- Full Page Watermark Container --- */
