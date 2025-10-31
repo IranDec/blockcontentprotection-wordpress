@@ -17,47 +17,54 @@ const processedVideos = new WeakSet();
 
 // --- Core Video Protection Logic ---
 const protectVideo = (video) => {
-    if (processedVideos.has(video) || video.dataset.bcpProtected === 'true') return;
-    processedVideos.add(video);
+    // If the video is already correctly wrapped, we don't need to do anything.
+    // This is the key fix for lightboxes or other scripts that move video elements in the DOM.
+    if (video.parentElement?.classList.contains('bcp-watermark-wrapper')) {
+        return;
+    }
+
+    // Apply one-time protections only if the video is new.
+    if (!processedVideos.has(video)) {
+        processedVideos.add(video);
+        video.setAttribute('controlsList', 'nodownload');
+        video.setAttribute('disablePictureInPicture', 'true');
+
+        // Blob URL Download Protection should only run once.
+        if (bcp_settings.disable_video_download) {
+            const originalSrc = video.getAttribute('src') || video.querySelector('source')?.getAttribute('src');
+            if (originalSrc && !originalSrc.startsWith('blob:')) {
+                video.pause();
+                video.removeAttribute('src');
+                video.querySelectorAll('source').forEach(s => s.remove());
+                video.load();
+
+                fetch(originalSrc, { credentials: 'omit' })
+                    .then(response => {
+                        if (!response.ok) throw new Error(`BCP: Network error fetching video: ${response.statusText}`);
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        video.src = URL.createObjectURL(blob);
+                    })
+                    .catch(err => {
+                        console.error('BCP Error:', err);
+                        video.setAttribute('src', originalSrc); // Restore on failure
+                    });
+            }
+        }
+    }
+
     video.dataset.bcpProtected = 'true';
 
-    // Apply general protections
-    video.setAttribute('controlsList', 'nodownload');
-    video.setAttribute('disablePictureInPicture', 'true');
-
-    // A. Handle Watermarking
-    let wrapper = video.closest('.bcp-watermark-wrapper');
-    if (!wrapper) {
-        wrapper = document.createElement('div');
+    // A. Handle Watermarking - Re-wrap the video if it's been moved.
+    if (video.parentNode) { // Ensure the video is attached to the DOM
+        const wrapper = document.createElement('div');
         wrapper.classList.add('bcp-watermark-wrapper');
         video.parentNode.insertBefore(wrapper, video);
         wrapper.appendChild(video);
-    }
-    if (bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
-        applyWatermark(wrapper);
-    }
 
-    // B. Blob URL Download Protection
-    if (bcp_settings.disable_video_download) {
-        const originalSrc = video.getAttribute('src') || video.querySelector('source')?.getAttribute('src');
-        if (originalSrc && !originalSrc.startsWith('blob:')) {
-            video.pause();
-            video.removeAttribute('src');
-            video.querySelectorAll('source').forEach(s => s.remove());
-            video.load();
-
-            fetch(originalSrc, { credentials: 'omit' })
-                .then(response => {
-                    if (!response.ok) throw new Error(`BCP: Network error fetching video: ${response.statusText}`);
-                    return response.blob();
-                })
-                .then(blob => {
-                    video.src = URL.createObjectURL(blob);
-                })
-                .catch(err => {
-                    console.error('BCP Error:', err);
-                    video.setAttribute('src', originalSrc); // Restore on failure
-                });
+        if (bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
+            applyWatermark(wrapper);
         }
     }
 };
