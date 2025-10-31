@@ -14,6 +14,7 @@ if (settingsElement) {
 
 
 const processedVideos = new WeakSet();
+const watermarkObservers = new WeakMap();
 
 // --- Core Video Protection Logic ---
 const protectVideo = (video) => {
@@ -71,12 +72,20 @@ const protectVideo = (video) => {
 
 // --- Watermark Application Logic ---
 const applyWatermark = (wrapper) => {
+    // Disconnect any existing observer for this wrapper before removing the watermark
+    if (watermarkObservers.has(wrapper)) {
+        watermarkObservers.get(wrapper).disconnect();
+        watermarkObservers.delete(wrapper);
+    }
+
     wrapper.querySelector('.bcp-watermark, .bcp-wm-style-pattern')?.remove();
 
     const opacity = parseFloat(bcp_settings.watermark_opacity) || 0.5;
     const position = bcp_settings.watermark_position || 'animated';
     const style = bcp_settings.watermark_style || 'text';
     const text = bcp_settings.watermark_text;
+
+    let watermarkElement; // This will be the element we observe
 
     if (style === 'pattern') {
         const patternContainer = document.createElement('div');
@@ -89,12 +98,45 @@ const applyWatermark = (wrapper) => {
             patternContainer.appendChild(span);
         }
         wrapper.appendChild(patternContainer);
+        watermarkElement = patternContainer; // Observe the container of the spans
     } else { // 'text' style
         const watermark = document.createElement('div');
         watermark.className = `bcp-watermark bcp-wm-style-text bcp-wm-position-${position}`;
         watermark.textContent = text;
         watermark.style.opacity = opacity;
         wrapper.appendChild(watermark);
+        watermarkElement = watermark; // Observe the single text element
+    }
+
+    // --- Responsive Font Size Logic ---
+    if ('ResizeObserver' in window && watermarkElement) {
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const { width, height } = entry.contentRect;
+                const smallerDim = Math.min(width, height);
+
+                // Adjust font size relative to the container's smaller dimension
+                // Clamped between 12px and 32px for readability.
+                const fontSize = Math.max(12, Math.min(32, smallerDim * 0.03));
+
+                // For pattern, apply to spans. For text, apply to the watermark itself.
+                if (style === 'pattern') {
+                    const spans = entry.target.querySelectorAll('.bcp-watermark-pattern-span');
+                    spans.forEach(span => {
+                        span.style.fontSize = `${fontSize}px`;
+                    });
+                } else {
+                    entry.target.style.fontSize = `${fontSize}px`;
+                }
+            }
+        });
+
+        // Observe the wrapper, as the watermark itself has absolute positioning
+        // and won't have a reliable size. The wrapper's size is tied to the video.
+        resizeObserver.observe(wrapper);
+
+        // Store the observer instance so we can disconnect it later if needed
+        watermarkObservers.set(wrapper, resizeObserver);
     }
 };
 
