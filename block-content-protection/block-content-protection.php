@@ -3,7 +3,7 @@
  * Plugin Name:       Block Content Protection
  * Description:       A comprehensive plugin to protect website content. Blocks screenshots, screen recording, right-click, developer tools, and more.
  * Plugin URI:        https://adschi.com/
- * Version:           1.6.7
+ * Version:           1.6.8
  * Author:            Mohammad Babaei
  * Author URI:        https://adschi.com/
  * License:           GPL-2.0+
@@ -368,7 +368,7 @@ function bcp_enqueue_scripts() {
         }
 
         // Enqueue the new module script
-        wp_enqueue_script( 'bcp-protect-module', BCP_PLUGIN_URL . 'js/protect.module.js', [], '1.6.7', true );
+        wp_enqueue_script( 'bcp-protect-module', BCP_PLUGIN_URL . 'js/protect.module.js', [], '1.6.8', true );
 
         // Create a data bridge for the module
         add_action('wp_footer', function() use ($options) {
@@ -378,7 +378,7 @@ function bcp_enqueue_scripts() {
 
         // Enqueue styles if needed
         if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) ) {
-            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.7' );
+            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.8' );
         }
     }
 }
