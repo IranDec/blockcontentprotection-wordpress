@@ -103,62 +103,32 @@ if (typeof bcp_settings === 'undefined') {
     };
 
     // --- Fullscreen Watermark Handling ---
-    let fullscreenWatermarkObserver = null;
     const handleFullscreenChange = () => {
         const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+        const wrappers = document.querySelectorAll('.bcp-watermark-wrapper');
 
-        // Disconnect any existing observer
-        if (fullscreenWatermarkObserver) {
-            fullscreenWatermarkObserver.disconnect();
-            fullscreenWatermarkObserver = null;
-        }
+        // First, remove the class from all wrappers to handle exiting fullscreen
+        wrappers.forEach(wrapper => {
+            wrapper.classList.remove('bcp-is-fullscreen');
+        });
 
-        // Clean up any lingering watermarks
-        document.querySelectorAll('.bcp-fullscreen-watermark').forEach(wm => wm.remove());
+        // If an element is in fullscreen, find its wrapper and add the class
+        if (fullscreenElement) {
+            // Check if the fullscreen element is a video or if it contains a video.
+            // This handles cases where the wrapper itself or the video element goes fullscreen.
+            let videoElement = null;
+            if (fullscreenElement.tagName === 'VIDEO') {
+                videoElement = fullscreenElement;
+            } else {
+                videoElement = fullscreenElement.querySelector('video');
+            }
 
-        // Check if we entered fullscreen with a video that should be protected
-        if (fullscreenElement && fullscreenElement.tagName === 'VIDEO' && processedVideos.has(fullscreenElement) && bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
-
-            const createWatermark = () => {
-                // Double-check and remove before creating a new one
-                document.querySelectorAll('.bcp-fullscreen-watermark').forEach(wm => wm.remove());
-
-                const watermark = document.createElement('div');
-                watermark.className = 'bcp-watermark bcp-fullscreen-watermark'; // Base classes
-                watermark.textContent = bcp_settings.watermark_text;
-                watermark.style.opacity = parseFloat(bcp_settings.watermark_opacity) || 0.5;
-
-                const position = bcp_settings.watermark_position || 'animated';
-                const style = bcp_settings.watermark_style || 'text';
-
-                // We only support 'text' style for fullscreen for now, as pattern is more complex.
-                watermark.classList.add('bcp-wm-style-text');
-                if (position === 'animated') {
-                    watermark.classList.add('bcp-wm-position-animated');
-                } else {
-                    watermark.classList.add(`bcp-wm-position-${position}`);
+            if (videoElement && processedVideos.has(videoElement)) {
+                const wrapper = videoElement.closest('.bcp-watermark-wrapper');
+                if (wrapper) {
+                    wrapper.classList.add('bcp-is-fullscreen');
                 }
-
-                // Append directly to the fullscreen element itself.
-                // This is crucial for keeping it contained within the fullscreen view.
-                fullscreenElement.parentElement.appendChild(watermark);
-
-                 // Add ResizeObserver to adjust font size based on video dimensions
-                 if ('ResizeObserver' in window) {
-                    fullscreenWatermarkObserver = new ResizeObserver(entries => {
-                        for (let entry of entries) {
-                            const { width, height } = entry.contentRect;
-                            // Simple scaling factor: font size as a percentage of the smaller dimension
-                            const smallerDimension = Math.min(width, height);
-                            const fontSize = Math.max(12, Math.min(32, smallerDimension * 0.03)); // Clamp font size between 12px and 32px
-                            watermark.style.fontSize = `${fontSize}px`;
-                        }
-                    });
-                    fullscreenWatermarkObserver.observe(fullscreenElement);
-                }
-            };
-            // Use a small timeout to ensure the fullscreen transition is complete
-            setTimeout(createWatermark, 100);
+            }
         }
     };
 
