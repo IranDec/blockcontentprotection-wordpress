@@ -25,6 +25,12 @@ if (typeof bcp_settings === 'undefined') {
             video.parentNode.insertBefore(wrapper, video);
             wrapper.appendChild(video);
         }
+        // Ensure the wrapper has a unique ID for reliable fullscreen detection
+        if (!wrapper.id) {
+            const wrapperId = `bcp-wrapper-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            wrapper.id = wrapperId;
+        }
+        video.dataset.bcpWrapperId = wrapper.id;
 
         if (bcp_settings.enable_video_watermark && bcp_settings.watermark_text && bcp_settings.watermark_text.length > 0) {
             applyWatermark(wrapper, video);
@@ -102,20 +108,61 @@ if (typeof bcp_settings === 'undefined') {
         }
     };
 
+    // --- Responsive Watermark Sizing ---
+    // Use a single ResizeObserver for all videos for better performance.
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const video = entry.target;
+            const wrapper = document.getElementById(video.dataset.bcpWrapperId);
+            if (!wrapper) continue;
+
+            const watermark = wrapper.querySelector('.bcp-watermark, .bcp-wm-style-pattern');
+            if (!watermark) continue;
+
+            // Adjust font size based on video height.
+            // The calculation can be tuned for better visual results.
+            const newSize = Math.max(12, Math.min(40, video.clientHeight / 30)); // Clamp between 12px and 40px
+
+            // For pattern watermarks, adjust all spans inside
+            if (watermark.classList.contains('bcp-wm-style-pattern')) {
+                 wrapper.querySelectorAll('.bcp-watermark-pattern-span').forEach(span => {
+                    span.style.fontSize = `${newSize}px`;
+                 });
+            } else { // For single text watermark
+                watermark.style.fontSize = `${newSize}px`;
+            }
+        }
+    });
+
+
     // --- Fullscreen Watermark Handling ---
     const handleFullscreenChange = () => {
         const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
-        const wrappers = document.querySelectorAll('.bcp-watermark-wrapper');
 
-        // First, remove the class from all wrappers to handle exiting fullscreen
-        wrappers.forEach(wrapper => {
-            wrapper.classList.remove('bcp-is-fullscreen');
-        });
+        // Find any wrapper that is currently marked as fullscreen and remove the class.
+        const currentFullscreenWrapper = document.querySelector('.bcp-is-fullscreen');
+        if (currentFullscreenWrapper) {
+            currentFullscreenWrapper.classList.remove('bcp-is-fullscreen');
+            // Stop observing the video when it exits fullscreen
+            const video = currentFullscreenWrapper.querySelector('video');
+            if (video) {
+                resizeObserver.unobserve(video);
+                // Optional: Reset font size
+                const watermark = currentFullscreenWrapper.querySelector('.bcp-watermark, .bcp-wm-style-pattern');
+                if (watermark) {
+                     if (watermark.classList.contains('bcp-wm-style-pattern')) {
+                         currentFullscreenWrapper.querySelectorAll('.bcp-watermark-pattern-span').forEach(span => {
+                            span.style.fontSize = ''; // Reset to CSS default
+                         });
+                    } else {
+                        watermark.style.fontSize = ''; // Reset to CSS default
+                    }
+                }
+            }
+        }
 
-        // If an element is in fullscreen, find its wrapper and add the class
+        // If an element has entered fullscreen, find its corresponding video and wrapper.
         if (fullscreenElement) {
-            // Check if the fullscreen element is a video or if it contains a video.
-            // This handles cases where the wrapper itself or the video element goes fullscreen.
             let videoElement = null;
             if (fullscreenElement.tagName === 'VIDEO') {
                 videoElement = fullscreenElement;
@@ -123,10 +170,12 @@ if (typeof bcp_settings === 'undefined') {
                 videoElement = fullscreenElement.querySelector('video');
             }
 
-            if (videoElement && processedVideos.has(videoElement)) {
-                const wrapper = videoElement.closest('.bcp-watermark-wrapper');
+            if (videoElement && videoElement.dataset.bcpWrapperId) {
+                const wrapper = document.getElementById(videoElement.dataset.bcpWrapperId);
                 if (wrapper) {
                     wrapper.classList.add('bcp-is-fullscreen');
+                    // Start observing the video when it enters fullscreen
+                    resizeObserver.observe(videoElement);
                 }
             }
         }
