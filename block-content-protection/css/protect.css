@@ -17,23 +17,13 @@
     pointer-events: auto;
 }
 
-/* Ensure the wrapper fills the screen in fullscreen mode */
-.bcp-watermark-wrapper:fullscreen {
-    width: 100%;
-    height: 100%;
-}
-
-/* Make sure the video also fills the screen inside the fullscreen wrapper */
-.bcp-watermark-wrapper:fullscreen > video {
-    width: 100%;
-    height: 100%;
-}
-
-/* Z-index for the specific fullscreen watermark to ensure it's on top */
-div.bcp-fullscreen-watermark {
-    position: fixed; /* Use fixed positioning to overlay the entire screen */
-    z-index: 2147483647 !important; /* Max z-index */
-    /* Animation keyframes will handle the positioning */
+/* --- Fullscreen Mode --- */
+/* When the wrapper has the fullscreen class, make its watermark children fixed */
+.bcp-watermark-wrapper.bcp-is-fullscreen .bcp-watermark,
+.bcp-watermark-wrapper.bcp-is-fullscreen .bcp-wm-style-pattern {
+    position: fixed;
+    /* Use the highest possible z-index to ensure it's on top of the video */
+    z-index: 2147483647;
 }
 
 /* --- Full Page Watermark Container --- */
