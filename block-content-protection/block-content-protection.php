@@ -82,8 +82,10 @@ function bcp_register_settings() {
     // add_settings_field( 'enable_page_watermark', __( 'Enable Full Page Watermark', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'enable_page_watermark', 'description' => __( 'Enable this to show a dynamic watermark over the entire page.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_text', __( 'Watermark Text', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_text', 'description' => __( 'Enter text for the watermark. Use placeholders: {user_login}, {user_email}, {user_mobile}, {ip_address}, {date}.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_opacity', __( 'Watermark Opacity', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_opacity', 'description' => __( 'Set the opacity from 0 (transparent) to 1 (opaque). Default: 0.5', 'block-content-protection' ), 'min' => 0, 'max' => 1, 'step' => '0.1' ] );
-    add_settings_field( 'watermark_position', __( 'Watermark Position', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_position', 'description' => __( 'Select the watermark position.', 'block-content-protection' ), 'options' => [ 'animated' => 'Animated', 'top_left' => 'Top Left', 'top_right' => 'Top Right', 'bottom_left' => 'Bottom Left', 'bottom_right' => 'Bottom Right', ] ] );
+    add_settings_field( 'watermark_animated', __( 'Enable Watermark Animation', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_animated', 'description' => __( 'Enable to make the watermark move across the video.', 'block-content-protection' ) ] );
+    add_settings_field( 'watermark_position', __( 'Watermark Position', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_position', 'description' => __( 'Select the watermark position (only applies if animation is disabled).', 'block-content-protection' ), 'options' => [ 'top_left' => 'Top Left', 'top_right' => 'Top Right', 'bottom_left' => 'Bottom Left', 'bottom_right' => 'Bottom Right', ] ] );
     add_settings_field( 'watermark_style', __( 'Watermark Style', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_style', 'description' => __( 'Select the watermark style.', 'block-content-protection' ), 'options' => [ 'text' => 'Simple Text', 'pattern' => 'Pattern' ] ] );
+    add_settings_field( 'watermark_count', __( 'Watermark Count', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_count', 'description' => __( 'Number of watermarks to display (for pattern style). Default: 30', 'block-content-protection' ), 'min' => 1, 'max' => 100, 'step' => 1 ] );
 }
 add_action( 'admin_init', 'bcp_register_settings' );
 
@@ -160,7 +162,7 @@ function bcp_sanitize_options( $input ) {
         'disable_text_selection', 'disable_image_drag', 'disable_video_download',
         'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block',
         'video_screen_record_block', 'enable_video_watermark', //'enable_page_watermark',
-        'enable_custom_messages'
+        'enable_custom_messages', 'watermark_animated'
     ];
 
     // For each checkbox, if it was submitted (checked), set to 1. Otherwise (unchecked), set to 0.
@@ -194,6 +196,9 @@ function bcp_sanitize_options( $input ) {
     }
     if ( isset( $input['watermark_style'] ) ) {
         $new_options['watermark_style'] = sanitize_key( $input['watermark_style'] );
+    }
+    if ( isset( $input['watermark_count'] ) ) {
+        $new_options['watermark_count'] = intval( $input['watermark_count'] );
     }
 
     return $new_options;
@@ -438,8 +443,10 @@ function bcp_activation() {
         'enable_video_watermark'    => 0,
         //'enable_page_watermark'     => 0,
         'watermark_opacity'         => 0.5,
-        'watermark_position'        => 'animated',
+        'watermark_animated'        => 1,
+        'watermark_position'        => 'top_left',
         'watermark_style'           => 'text',
+        'watermark_count'           => 30,
     ];
     if ( false === get_option( 'bcp_options' ) ) {
         update_option( 'bcp_options', $defaults );

@@ -20,7 +20,7 @@ const protectVideo = (video) => {
     video.dataset.bcpProtected = 'true';
 
     // Disable native controls that are not needed
-    video.setAttribute('controlsList', 'nodownload nofullscreen');
+    video.setAttribute('controlsList', 'nodownload');
     video.setAttribute('disablePictureInPicture', 'true');
 
     // Create a wrapper for the video and its watermark
@@ -68,22 +68,23 @@ const protectVideoSource = (video) => {
 const applyWatermark = (wrapper) => {
     // Remove any existing watermark to prevent duplicates
     wrapper.querySelector('.bcp-watermark, .bcp-wm-style-pattern')?.remove();
-    const { watermark_opacity = 0.5, watermark_position = 'animated', watermark_style = 'text', watermark_text } = bcp_settings;
+    const { watermark_opacity = 0.5, watermark_animated = true, watermark_position = 'top_left', watermark_style = 'text', watermark_text, watermark_count = 30 } = bcp_settings;
 
     const element = document.createElement('div');
     if (watermark_style === 'pattern') {
         element.className = 'bcp-wm-style-pattern';
         element.style.opacity = watermark_opacity;
         // Create multiple spans for the pattern effect
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < watermark_count; i++) {
             const span = document.createElement('span');
             span.className = 'bcp-watermark-pattern-span';
             span.textContent = watermark_text;
             element.appendChild(span);
         }
     } else {
-        // Apply classes for styling and positioning
-        element.className = `bcp-watermark bcp-wm-style-text bcp-wm-position-${watermark_position}`;
+        // Determine the correct class based on whether animation is enabled
+        const positionClass = watermark_animated ? 'bcp-wm-position-animated' : `bcp-wm-position-${watermark_position}`;
+        element.className = `bcp-watermark bcp-wm-style-text ${positionClass}`;
         element.textContent = watermark_text;
         element.style.opacity = watermark_opacity;
     }
