@@ -42,6 +42,13 @@
     height: 20px;
     fill: #fff;
     display: block;
+/* --- Fullscreen Mode --- */
+/* When the wrapper has the fullscreen class, make its watermark children fixed */
+.bcp-watermark-wrapper.bcp-is-fullscreen .bcp-watermark,
+.bcp-watermark-wrapper.bcp-is-fullscreen .bcp-wm-style-pattern {
+    position: fixed;
+    /* Use the highest possible z-index to ensure it's on top of the video */
+    z-index: 2147483647;
 }
 
 /* --- Fullscreen State --- */
