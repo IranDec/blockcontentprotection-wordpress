@@ -3,7 +3,7 @@
  * Plugin Name:       Block Content Protection
  * Description:       A comprehensive plugin to protect website content. Blocks screenshots, screen recording, right-click, developer tools, and more.
  * Plugin URI:        https://adschi.com/
- * Version:           1.6.9
+ * Version:           1.6.6
  * Author:            Mohammad Babaei
  * Author URI:        https://adschi.com/
  * License:           GPL-2.0+
@@ -368,7 +368,7 @@ function bcp_enqueue_scripts() {
         }
 
         // Enqueue the new module script
-        wp_enqueue_script( 'bcp-protect-module', BCP_PLUGIN_URL . 'js/protect.module.js', [], '1.6.9', true );
+        wp_enqueue_script( 'bcp-protect-module', BCP_PLUGIN_URL . 'js/protect.module.js', [], '1.6.6', true );
 
         // Create a data bridge for the module
         add_action('wp_footer', function() use ($options) {
@@ -378,7 +378,7 @@ function bcp_enqueue_scripts() {
 
         // Enqueue styles if needed
         if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) ) {
-            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.9' );
+            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.6' );
         }
     }
 }
@@ -416,39 +416,6 @@ function bcp_enqueue_admin_scripts( $hook ) {
     );
 }
 add_action( 'admin_enqueue_scripts', 'bcp_enqueue_admin_scripts' );
-
-/**
- * Handles the [protected_video] shortcode.
- *
- * @param array $atts Shortcode attributes.
- * @return string HTML output for the video.
- */
-function bcp_protected_video_shortcode( $atts ) {
-    // Set default attributes and parse the user's input
-    $atts = shortcode_atts(
-        array(
-            'src' => '',
-        ),
-        $atts,
-        'protected_video'
-    );
-
-    // If the 'src' attribute is missing, return an empty string.
-    if ( empty( $atts['src'] ) ) {
-        return '<!-- Protected video: src attribute missing -->';
-    }
-
-    // Sanitize the URL to prevent security issues.
-    $video_url = esc_url( $atts['src'] );
-
-    // Build the video tag.
-    // The 'protected-video' class is essential for our JavaScript to find and enhance it.
-    // 'controlsList="nofullscreen"' attempts to hide the native fullscreen button.
-    $video_html = '<video class="protected-video" src="' . $video_url . '" controls controlsList="nofullscreen"></video>';
-
-    return $video_html;
-}
-add_shortcode( 'protected_video', 'bcp_protected_video_shortcode' );
 
 function bcp_activation() {
     $defaults = [
