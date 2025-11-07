@@ -134,7 +134,24 @@ const handleKeydown = (e) => {
 
 // Intercept screen recording attempts
 const handleScreenRecording = () => {
-    if (!bcp_settings.video_screen_record_block || !navigator.mediaDevices?.getDisplayMedia) return;
+    if (!bcp_settings.video_screen_record_block) return;
+
+    // Black out video when tab loses focus
+    document.addEventListener('visibilitychange', () => {
+        const isPageHidden = document.hidden;
+        document.querySelectorAll('video').forEach(v => {
+            const wrapper = v.closest('.bcp-watermark-wrapper');
+            if (wrapper) {
+                if (isPageHidden) {
+                    wrapper.classList.add('bcp-recording-detected');
+                } else {
+                    wrapper.classList.remove('bcp-recording-detected');
+                }
+            }
+        });
+    });
+
+    if (!navigator.mediaDevices?.getDisplayMedia) return;
 
     const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia;
     navigator.mediaDevices.getDisplayMedia = async function(...args) {
