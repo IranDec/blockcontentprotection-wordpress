@@ -55,6 +55,21 @@
     height: 100%;
 }
 
+/* Force-hide the native fullscreen button */
+.bcp-watermark-wrapper video::-webkit-media-controls-fullscreen-button {
+    display: none !important;
+}
+.bcp-watermark-wrapper video::-moz-fullscreen-button {
+    display: none !important;
+}
+.bcp-watermark-wrapper video::-ms-fullscreen-button {
+    display: none !important;
+}
+.bcp-watermark-wrapper video::-webkit-media-controls-panel [role="button"][aria-label~="fullscreen" i] {
+    display: none !important;
+}
+
+
 /* --- Watermark Base Styles --- */
 .bcp-watermark, .bcp-watermark-pattern-span {
     position: absolute;
