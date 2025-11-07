@@ -1,163 +1,95 @@
 // --- Settings Initialization ---
 let bcp_settings = {};
 const settingsElement = document.getElementById('bcp-settings-data');
-
 if (settingsElement) {
     try {
         bcp_settings = JSON.parse(settingsElement.textContent);
     } catch (e) {
         console.error("BCP Error: Could not parse settings data.", e);
     }
-} else {
-    console.error("BCP Error: Settings data element not found.");
 }
 
+// Use a WeakSet to keep track of videos that have already been processed
 const processedVideos = new WeakSet();
-const watermarkObservers = new WeakMap();
 
 // --- Core Video Protection Logic ---
 const protectVideo = (video) => {
-    // If the video is already correctly wrapped, we don't need to do anything.
-    // This is the key fix for lightboxes or other scripts that move video elements in the DOM.
-    if (video.parentElement?.classList.contains('bcp-watermark-wrapper')) {
-        return;
-    }
-
-    // Apply one-time protections only if the video is new.
-    if (!processedVideos.has(video)) {
-        processedVideos.add(video);
-        video.setAttribute('controlsList', 'nodownload');
-        video.setAttribute('disablePictureInPicture', 'true');
-
-        // Blob URL Download Protection should only run once.
-        if (bcp_settings.disable_video_download) {
-            const originalSrc = video.getAttribute('src') || video.querySelector('source')?.getAttribute('src');
-            if (originalSrc && !originalSrc.startsWith('blob:')) {
-                video.pause();
-                video.removeAttribute('src');
-                video.querySelectorAll('source').forEach(s => s.remove());
-                video.load();
-
-                fetch(originalSrc, { credentials: 'omit' })
-                    .then(response => {
-                        if (!response.ok) throw new Error(`BCP: Network error fetching video: ${response.statusText}`);
-                        return response.blob();
-                    })
-                    .then(blob => {
-                        video.src = URL.createObjectURL(blob);
-                    })
-                    .catch(err => {
-                        console.error('BCP Error:', err);
-                        video.setAttribute('src', originalSrc); // Restore on failure
-                    });
-            }
-        }
-    }
-
+    // Exit if the video has already been processed or is marked as protected
+    if (processedVideos.has(video) || video.dataset.bcpProtected === 'true') return;
+    processedVideos.add(video);
     video.dataset.bcpProtected = 'true';
 
-    // Create a wrapper for the video and watermark
+    // Disable native controls that are not needed
+    video.setAttribute('controlsList', 'nodownload nofullscreen');
+    video.setAttribute('disablePictureInPicture', 'true');
+
+    // Create a wrapper for the video and its watermark
     let wrapper = document.createElement('div');
     wrapper.classList.add('bcp-watermark-wrapper');
+    // Insert the wrapper before the video and then move the video inside it
     video.parentNode.insertBefore(wrapper, video);
     wrapper.appendChild(video);
 
-    // Add watermark if enabled
+    // Apply watermark if enabled in settings
     if (bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
         applyWatermark(wrapper);
     }
 
-    // Add custom fullscreen button
+    // Add the custom fullscreen button
     addCustomFullscreenButton(wrapper);
 
-    // Blob URL Download Protection
+    // Secure the video source if download protection is enabled
     if (bcp_settings.disable_video_download) {
-        // Blob logic remains the same...
-    // A. Handle Watermarking - Re-wrap the video if it's been moved.
-    if (video.parentNode) { // Ensure the video is attached to the DOM
-        const wrapper = document.createElement('div');
-        wrapper.classList.add('bcp-watermark-wrapper');
-        video.parentNode.insertBefore(wrapper, video);
-        wrapper.appendChild(video);
-
-        if (bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
-            applyWatermark(wrapper);
-        }
+        protectVideoSource(video);
     }
 };
 
-// --- Watermark Application Logic ---
-const applyWatermark = (wrapper) => {
-    // This function remains largely the same.
-    // Disconnect any existing observer for this wrapper before removing the watermark
-    if (watermarkObservers.has(wrapper)) {
-        watermarkObservers.get(wrapper).disconnect();
-        watermarkObservers.delete(wrapper);
+const protectVideoSource = (video) => {
+    const originalSrc = video.getAttribute('src') || video.querySelector('source')?.getAttribute('src');
+    // Only process if there's a source and it's not already a blob URL
+    if (originalSrc && !originalSrc.startsWith('blob:')) {
+        // Fetch the video as a blob to obscure the direct URL
+        fetch(originalSrc, { credentials: 'omit' })
+            .then(response => {
+                if (!response.ok) throw new Error(`BCP: Network error fetching video: ${response.statusText}`);
+                return response.blob();
+            })
+            .then(blob => {
+                video.src = URL.createObjectURL(blob);
+            })
+            .catch(err => {
+                console.error('BCP Error:', err);
+                video.setAttribute('src', originalSrc); // Restore original source on failure
+            });
     }
+}
 
+// --- Watermark & Fullscreen UI ---
+const applyWatermark = (wrapper) => {
+    // Remove any existing watermark to prevent duplicates
     wrapper.querySelector('.bcp-watermark, .bcp-wm-style-pattern')?.remove();
-    const opacity = parseFloat(bcp_settings.watermark_opacity) || 0.5;
-    const position = bcp_settings.watermark_position || 'animated';
-    const style = bcp_settings.watermark_style || 'text';
-    const text = bcp_settings.watermark_text;
+    const { watermark_opacity = 0.5, watermark_position = 'animated', watermark_style = 'text', watermark_text } = bcp_settings;
 
-    let watermarkElement; // This will be the element we observe
-
-    if (style === 'pattern') {
-        const patternContainer = document.createElement('div');
-        patternContainer.className = 'bcp-wm-style-pattern';
-        patternContainer.style.opacity = opacity;
+    const element = document.createElement('div');
+    if (watermark_style === 'pattern') {
+        element.className = 'bcp-wm-style-pattern';
+        element.style.opacity = watermark_opacity;
+        // Create multiple spans for the pattern effect
         for (let i = 0; i < 30; i++) {
             const span = document.createElement('span');
             span.className = 'bcp-watermark-pattern-span';
-            span.textContent = text;
-            patternContainer.appendChild(span);
+            span.textContent = watermark_text;
+            element.appendChild(span);
         }
-        wrapper.appendChild(patternContainer);
     } else {
-        watermarkElement = patternContainer; // Observe the container of the spans
-    } else { // 'text' style
-        const watermark = document.createElement('div');
-        watermark.className = `bcp-watermark bcp-wm-style-text bcp-wm-position-${position}`;
-        watermark.textContent = text;
-        watermark.style.opacity = opacity;
-        wrapper.appendChild(watermark);
-        watermarkElement = watermark; // Observe the single text element
+        // Apply classes for styling and positioning
+        element.className = `bcp-watermark bcp-wm-style-text bcp-wm-position-${watermark_position}`;
+        element.textContent = watermark_text;
+        element.style.opacity = watermark_opacity;
     }
-
-    // --- Responsive Font Size Logic ---
-    if ('ResizeObserver' in window && watermarkElement) {
-        const resizeObserver = new ResizeObserver(entries => {
-            for (let entry of entries) {
-                const { width, height } = entry.contentRect;
-                const smallerDim = Math.min(width, height);
-
-                // Adjust font size relative to the container's smaller dimension
-                // Clamped between 12px and 32px for readability.
-                const fontSize = Math.max(12, Math.min(32, smallerDim * 0.03));
-
-                // For pattern, apply to spans. For text, apply to the watermark itself.
-                if (style === 'pattern') {
-                    const spans = entry.target.querySelectorAll('.bcp-watermark-pattern-span');
-                    spans.forEach(span => {
-                        span.style.fontSize = `${fontSize}px`;
-                    });
-                } else {
-                    entry.target.style.fontSize = `${fontSize}px`;
-                }
-            }
-        });
-
-        // Observe the wrapper, as the watermark itself has absolute positioning
-        // and won't have a reliable size. The wrapper's size is tied to the video.
-        resizeObserver.observe(wrapper);
-
-        // Store the observer instance so we can disconnect it later if needed
-        watermarkObservers.set(wrapper, resizeObserver);
-    }
+    wrapper.appendChild(element);
 };
 
-// --- Custom Fullscreen Logic ---
 const addCustomFullscreenButton = (wrapper) => {
     const button = document.createElement('button');
     button.className = 'bcp-custom-fullscreen-btn';
@@ -165,81 +97,114 @@ const addCustomFullscreenButton = (wrapper) => {
     button.innerHTML = '<svg viewbox="0 0 18 18"><path d="M4.5 11H3v4h4v-1.5H4.5V11zM3 7h1.5V4.5H7V3H3v4zm10.5 6.5H11V15h4v-4h-1.5v2.5zM11 3v1.5h2.5V7H15V3h-4z"></path></svg>';
     wrapper.appendChild(button);
 
+    // Handle cross-browser fullscreen requests
     button.addEventListener('click', () => {
-        toggleFullscreen(wrapper);
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            if (wrapper.requestFullscreen) wrapper.requestFullscreen();
+            else if (wrapper.webkitRequestFullscreen) wrapper.webkitRequestFullscreen();
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
     });
 };
 
-const toggleFullscreen = (element) => {
-    if (!document.fullscreenElement) {
-        if (element.requestFullscreen) {
-            element.requestFullscreen();
-        } else if (element.webkitRequestFullscreen) { /* Safari */
-            element.webkitRequestFullscreen();
+// --- General Protection Event Handlers ---
+const preventDefault = e => e.preventDefault();
+
+const handleKeydown = (e) => {
+    const key = e.key.toUpperCase();
+    const ctrl = e.ctrlKey || e.metaKey;
+
+    // Block developer tools shortcuts
+    if (bcp_settings.disable_devtools && (e.key === 'F12' || (ctrl && e.shiftKey && ['I', 'J', 'C'].includes(key)) || (ctrl && key === 'U'))) {
+        e.preventDefault();
+    }
+    // Block screenshot shortcuts
+    if (bcp_settings.disable_screenshot && (e.key === 'PrintScreen' || (ctrl && e.shiftKey && ['3', '4', 'S'].includes(key)))) {
+        e.preventDefault();
+        document.body.classList.add('bcp-screenshot-detected');
+        if (bcp_settings.enable_custom_messages && bcp_settings.screenshot_alert_message) {
+            alert(bcp_settings.screenshot_alert_message);
         }
-    } else {
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
-        } else if (document.webkitExitFullscreen) { /* Safari */
-            document.webkitExitFullscreen();
-        }
+        setTimeout(() => document.body.classList.remove('bcp-screenshot-detected'), 1000);
     }
 };
 
-// --- Event Handlers (keydown, screen recording, etc.) ---
-// These handlers remain the same as before...
-const preventDefault = e => e.preventDefault();
-const handleKeydown = (e) => {
-    // ... same code ...
-};
+// Intercept screen recording attempts
 const handleScreenRecording = () => {
-    // ... same code ...
-};
+    if (!bcp_settings.video_screen_record_block || !navigator.mediaDevices?.getDisplayMedia) return;
 
+    const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia;
+    navigator.mediaDevices.getDisplayMedia = async function(...args) {
+        // When a recording attempt is detected, apply a class to blur the video
+        document.querySelectorAll('video').forEach(v => v.closest('.bcp-watermark-wrapper')?.classList.add('bcp-recording-detected'));
+        try {
+            const stream = await originalGetDisplayMedia.apply(this, args);
+            // When the stream ends (user stops recording), remove the class
+            stream.getTracks().forEach(track => {
+                track.onended = () => document.querySelectorAll('.bcp-recording-detected').forEach(el => el.classList.remove('bcp-recording-detected'));
+            });
+            return stream;
+        } catch (err) {
+            // If the user cancels the recording, remove the class
+            document.querySelectorAll('.bcp-recording-detected').forEach(el => el.classList.remove('bcp-recording-detected'));
+            throw err;
+        }
+    };
+};
 
 // --- Initialization ---
 const initProtection = () => {
-    // Target only videos with the 'protected-video' class
-    document.querySelectorAll('video.protected-video').forEach(protectVideo);
+    // Apply protection to all existing video elements on the page
+    document.querySelectorAll('video').forEach(protectVideo);
+    // Disable text selection if enabled
     if (bcp_settings.disable_text_selection) {
         document.body.style.cssText += 'user-select:none;-webkit-user-select:none;';
     }
+    // Apply enhanced CSS protection if enabled
     if (bcp_settings.enhanced_protection) {
         document.body.classList.add('bcp-enhanced-protection');
     }
 };
 
+// Use a MutationObserver to detect and protect videos added to the DOM dynamically
 const observer = new MutationObserver(mutations => {
     mutations.forEach(mutation => {
         mutation.addedNodes.forEach(node => {
-            if (node.nodeType === 1) {
-                // Check if the node is a protected video or contains one
-                if (node.matches && node.matches('video.protected-video')) {
+            if (node.nodeType === 1) { // Element node
+                if (node.tagName === 'VIDEO') {
                     protectVideo(node);
-                } else if (node.querySelectorAll) {
-                    node.querySelectorAll('video.protected-video').forEach(protectVideo);
+                } else {
+                    // Also check for videos within newly added complex elements
+                    node.querySelectorAll?.('video').forEach(protectVideo);
                 }
             }
         });
     });
 });
 
-// --- Self-Executing Initialization ---
+// Main execution block
 const BCP_Init = () => {
+    // Run protection when the DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initProtection);
     } else {
         initProtection();
     }
 
+    // Start observing for future DOM changes
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Remove the old fullscreen listener
-    // ['fullscreenchange', 'webkitfullscreenchange'].forEach(e => document.addEventListener(e, handleFullscreenChange, false));
-
+    // Add global event listeners based on settings
     if (bcp_settings.disable_right_click) document.addEventListener('contextmenu', preventDefault, false);
-    // ... other event listeners remain the same ...
+    if (bcp_settings.disable_copy) document.addEventListener('copy', preventDefault, false);
+    if (bcp_settings.disable_image_drag) document.addEventListener('dragstart', e => { if (e.target.tagName === 'IMG') e.preventDefault(); }, false);
+    if (bcp_settings.disable_devtools || bcp_settings.disable_screenshot) {
+        document.addEventListener('keydown', handleKeydown);
+    }
+
+    handleScreenRecording();
 };
 
-// Run the initialization
 BCP_Init();

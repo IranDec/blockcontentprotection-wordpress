@@ -2,16 +2,6 @@
 
 All notable changes to Block Content Protection will be documented in this file.
 
-## [1.6.9] - 2025-10-31
-
-### Added
-- **Responsive Watermarks**: Implemented a `ResizeObserver` to make video watermarks responsive. The font size of the watermark now scales dynamically with the size of the video, ensuring it is always proportional and readable.
-
-## [1.6.8] - 2025-10-31
-
-### Fixed
-- **Fullscreen Watermark Disappearing**: Resolved a CSS specificity issue that caused the watermark to disappear when a video was viewed in fullscreen mode. The `position: fixed` rule is now correctly applied, ensuring the watermark remains visible.
-
 ## [1.6.6] - 2025-10-27
 
 ### Fixed
