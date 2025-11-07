@@ -386,8 +386,7 @@ add_action( 'wp_enqueue_scripts', 'bcp_enqueue_scripts' );
 
 function bcp_add_module_to_script( $tag, $handle, $src ) {
     if ( 'bcp-protect-module' === $handle ) {
-        // Since the module is self-executing, we just need to add type="module"
-        $tag = '<script type="module" src="' . esc_url( $src ) . '" id="' . esc_attr( $handle ) . '-js"></script>';
+        $tag = '<script type="module" src="' . esc_url( $src ) . '" id="' . esc_attr( $handle ) . '-js" defer></script>';
     }
     return $tag;
 }
@@ -417,6 +416,39 @@ function bcp_enqueue_admin_scripts( $hook ) {
     );
 }
 add_action( 'admin_enqueue_scripts', 'bcp_enqueue_admin_scripts' );
+
+/**
+ * Handles the [protected_video] shortcode.
+ *
+ * @param array $atts Shortcode attributes.
+ * @return string HTML output for the video.
+ */
+function bcp_protected_video_shortcode( $atts ) {
+    // Set default attributes and parse the user's input
+    $atts = shortcode_atts(
+        array(
+            'src' => '',
+        ),
+        $atts,
+        'protected_video'
+    );
+
+    // If the 'src' attribute is missing, return an empty string.
+    if ( empty( $atts['src'] ) ) {
+        return '<!-- Protected video: src attribute missing -->';
+    }
+
+    // Sanitize the URL to prevent security issues.
+    $video_url = esc_url( $atts['src'] );
+
+    // Build the video tag.
+    // The 'protected-video' class is essential for our JavaScript to find and enhance it.
+    // 'controlsList="nofullscreen"' attempts to hide the native fullscreen button.
+    $video_html = '<video class="protected-video" src="' . $video_url . '" controls controlsList="nofullscreen"></video>';
+
+    return $video_html;
+}
+add_shortcode( 'protected_video', 'bcp_protected_video_shortcode' );
 
 function bcp_activation() {
     $defaults = [
