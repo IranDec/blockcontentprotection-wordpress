@@ -385,6 +385,12 @@ function bcp_enqueue_scripts() {
         if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) ) {
             wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.6' );
         }
+
+        // Enqueue blackout scripts if screen recording protection is enabled
+        if ( ! empty( $options['video_screen_record_block'] ) ) {
+            wp_enqueue_script( 'bcp-blackout-js', BCP_PLUGIN_URL . 'js/blackout.js', [], '1.6.6', true );
+            wp_enqueue_style( 'bcp-blackout-css', BCP_PLUGIN_URL . 'css/blackout.css', [], '1.6.6' );
+        }
     }
 }
 add_action( 'wp_enqueue_scripts', 'bcp_enqueue_scripts' );
