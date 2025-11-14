@@ -2,15 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Video Watermark Test</title>
+    <title>Media Protection Test</title>
     <link rel="stylesheet" href="block-content-protection/css/protect.css">
 </head>
 <body>
     <h1>Video Watermark Test Page</h1>
-    <video controls width="600">
-        <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
+    <video controls width="600" src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
         Your browser does not support the video tag.
     </video>
+
+    <h1>Audio Protection Test Page</h1>
+    <audio controls src="https://www.w3schools.com/html/horse.ogg" type="audio/ogg">
+        Your browser does not support the audio tag.
+    </audio>
 
     <script type="application/json" id="bcp-settings-data">
         {
@@ -19,7 +23,9 @@
             "watermark_animated": 1,
             "watermark_opacity": 0.7,
             "watermark_count": 20,
-            "watermark_style": "pattern"
+            "watermark_style": "pattern",
+            "disable_media_download": 1,
+            "enable_expiring_links": 0
         }
     </script>
     <script src="block-content-protection/js/protect.module.js" type="module"></script>
