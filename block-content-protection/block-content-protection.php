@@ -108,47 +108,84 @@ function bcp_validate_media_token( $file_path, $expires, $token ) {
 }
 
 /**
- * Shortcode to embed protected media.
+ * Generates a secure, expiring URL for a given media source.
  */
-function bcp_media_shortcode( $atts ) {
-    $atts = shortcode_atts( [
-        'src' => '',
-    ], $atts, 'bcp_media' );
-
-    $src = $atts['src'];
-    if ( empty( $src ) ) {
-        return '';
+function bcp_get_media_url( $src ) {
+    $options = get_option( 'bcp_options', [] );
+    if ( empty( $src ) || empty( $options['enable_expiring_links'] ) ) {
+        return $src;
     }
 
-    $options = get_option( 'bcp_options', [] );
-    if ( empty( $options['enable_expiring_links'] ) ) {
-        // If expiring links are disabled, just return the normal media tag
-        $filetype = wp_check_filetype( $src );
-        if ( strpos( $filetype['type'], 'video' ) !== false ) {
-            return '<video controls src="' . esc_url( $src ) . '"></video>';
-        } elseif ( strpos( $filetype['type'], 'audio' ) !== false ) {
-            return '<audio controls src="' . esc_url( $src ) . '"></audio>';
-        }
-        return '';
+    // Don't re-protect an already protected URL
+    if ( strpos( $src, 'bcp_media_token=' ) !== false ) {
+        return $src;
     }
 
     $duration = ! empty( $options['expiring_links_duration'] ) ? intval( $options['expiring_links_duration'] ) : 3600;
     $expires = time() + $duration;
-    // URL-safe encoding for the src
     $encoded_src = rawurlencode( $src );
     $token = bcp_generate_media_token( $encoded_src, $expires );
 
-    $secure_url = add_query_arg( [
+    return add_query_arg( [
         'bcp_media_src' => $encoded_src,
         'bcp_expires'   => $expires,
         'bcp_media_token' => $token,
     ], home_url( '/' ) );
+}
 
+/**
+ * Automatically protects media in post content by replacing their URLs.
+ */
+function bcp_protect_media_in_content( $content ) {
+    $options = get_option( 'bcp_options', [] );
+
+    // Only run if the automatic protection is enabled
+    if ( empty( $options['enable_expiring_links'] ) || empty( $options['enable_automatic_protection'] ) ) {
+        return $content;
+    }
+
+    // Regex to find <video> and <audio> tags and their src attributes
+    $pattern = '/<(video|audio)([^>]*)src=["\']([^"\']+)["\']([^>]*)>/i';
+
+    return preg_replace_callback( $pattern, function( $matches ) {
+        $tag = $matches[1]; // video or audio
+        $pre_src_attrs = $matches[2];
+        $original_src = $matches[3];
+        $post_src_attrs = $matches[4];
+
+        // Generate the secure URL
+        $secure_url = bcp_get_media_url( $original_src );
+
+        // Reconstruct the tag with the new URL
+        return "<{$tag}{$pre_src_attrs}src=\"" . esc_url( $secure_url ) . "\"{$post_src_attrs}>";
+    }, $content );
+}
+add_filter( 'the_content', 'bcp_protect_media_in_content', 99 ); // High priority
+
+/**
+ * Shortcode to embed protected media.
+ */
+function bcp_media_shortcode( $atts ) {
+    $atts = shortcode_atts( [ 'src' => '' ], $atts, 'bcp_media' );
+    $src = $atts['src'];
+
+    if ( empty( $src ) ) {
+        return '';
+    }
+
+    $secure_url = bcp_get_media_url( $src );
     $filetype = wp_check_filetype( $src );
+    $tag_type = '';
+
     if ( strpos( $filetype['type'], 'video' ) !== false ) {
-        return '<video controls src="' . esc_url( $secure_url ) . '"></video>';
+        $tag_type = 'video';
     } elseif ( strpos( $filetype['type'], 'audio' ) !== false ) {
-        return '<audio controls src="' . esc_url( $secure_url ) . '"></audio>';
+        $tag_type = 'audio';
+    }
+
+    if ( $tag_type ) {
+        // If expiring links are disabled, bcp_get_media_url returns original src
+        return "<{$tag_type} controls src=\"" . esc_url( $secure_url ) . "\"></{$tag_type}>";
     }
 
     return '';
@@ -225,6 +262,7 @@ function bcp_register_settings() {
     // Expiring Links Section
     add_settings_section( 'bcp_expiring_links_section', __( 'Expiring Media Links', 'block-content-protection' ), null, 'block_content_protection' );
     add_settings_field( 'enable_expiring_links', __( 'Enable Expiring Links', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'enable_expiring_links', 'description' => __( 'Enable to generate secure, time-sensitive links for media files.', 'block-content-protection' ) ] );
+    add_settings_field( 'enable_automatic_protection', __( 'Enable Automatic Protection', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'enable_automatic_protection', 'description' => __( 'Automatically protect all video and audio tags in your content. If disabled, you must use the [bcp_media] shortcode.', 'block-content-protection' ) ] );
     add_settings_field( 'expiring_links_duration', __( 'Link Expiration Time (seconds)', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'expiring_links_duration', 'description' => __( 'Set how long the media links should be valid. Default: 3600 seconds (1 hour).', 'block-content-protection' ), 'min' => 60, 'step' => 60 ] );
     add_settings_field( 'watermark_opacity', __( 'Watermark Opacity', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_opacity', 'description' => __( 'Set the opacity from 0 (transparent) to 1 (opaque). Default: 0.5', 'block-content-protection' ), 'min' => 0, 'max' => 1, 'step' => '0.1' ] );
     add_settings_field( 'watermark_animated', __( 'Enable Watermark Animation', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_animated', 'description' => __( 'Enable to make the watermark move across the video.', 'block-content-protection' ) ] );
@@ -307,7 +345,8 @@ function bcp_sanitize_options( $input ) {
         'disable_text_selection', 'disable_image_drag', 'disable_media_download',
         'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block',
         'video_screen_record_block', 'enable_video_watermark', //'enable_page_watermark',
-        'enable_custom_messages', 'watermark_animated', 'enable_expiring_links'
+        'enable_custom_messages', 'watermark_animated', 'enable_expiring_links',
+        'enable_automatic_protection'
     ];
 
     // For each checkbox, if it was submitted (checked), set to 1. Otherwise (unchecked), set to 0.
@@ -600,6 +639,7 @@ function bcp_activation() {
         'watermark_text'            => '',
         'enable_video_watermark'    => 0,
         'enable_expiring_links'     => 0,
+        'enable_automatic_protection' => 1, // Enabled by default for better out-of-the-box protection
         'expiring_links_duration'   => 3600,
         //'enable_page_watermark'     => 0,
         'watermark_opacity'         => 0.5,
