@@ -18,49 +18,6 @@ if ( ! defined( 'WPINC' ) ) {
 
 define( 'BCP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-/**
- * Block access from known download managers by User-Agent.
- * This provides a server-side layer of protection.
- */
-function bcp_block_download_managers() {
-    $options = get_option( 'bcp_options', [] );
-
-    // Only run if the video download protection is enabled
-    if ( empty( $options['disable_video_download'] ) ) {
-        return;
-    }
-
-    // Check if the User-Agent is set
-    if ( ! isset( $_SERVER['HTTP_USER_AGENT'] ) ) {
-        return;
-    }
-
-    $user_agent = strtolower( $_SERVER['HTTP_USER_AGENT'] );
-    $blocked_agents = [ 'idm', 'internet download manager', 'flashget' ]; // Common download manager user agents
-
-    $is_blocked_agent = false;
-    foreach ( $blocked_agents as $agent ) {
-        if ( strpos( $user_agent, $agent ) !== false ) {
-            $is_blocked_agent = true;
-            break;
-        }
-    }
-
-    if ( $is_blocked_agent ) {
-        $request_uri = strtolower( $_SERVER['REQUEST_URI'] );
-        $video_extensions = [ '.mp4', '.webm', '.ogg', '.mov', '.flv', '.avi', '.mkv' ];
-
-        foreach ( $video_extensions as $ext ) {
-            if ( substr( $request_uri, -strlen( $ext ) ) === $ext ) {
-                header( 'HTTP/1.1 403 Forbidden' );
-                wp_die( 'Access to this video file is restricted.' );
-            }
-        }
-    }
-}
-add_action( 'init', 'bcp_block_download_managers' );
-
-
 function bcp_add_admin_menu() {
     add_menu_page(
         __( 'Content Protection', 'block-content-protection' ),
@@ -85,7 +42,7 @@ function bcp_register_settings() {
         'disable_copy'              => __( 'Disable Copy (Ctrl+C)', 'block-content-protection' ),
         'disable_text_selection'    => __( 'Disable Text Selection', 'block-content-protection' ),
         'disable_image_drag'        => __( 'Disable Image Dragging', 'block-content-protection' ),
-        'disable_video_download'    => __( 'Block Video Download (IDM, etc.)', 'block-content-protection' ),
+        'disable_video_download'    => __( 'Disable Video Download', 'block-content-protection' ),
         'disable_screenshot'        => __( 'Disable Screenshot Shortcuts', 'block-content-protection' ),
         'enhanced_protection'       => __( 'Enhanced Screen Protection', 'block-content-protection' ),
         'mobile_screenshot_block'   => __( 'Block Mobile Screenshots', 'block-content-protection' ),
@@ -93,9 +50,6 @@ function bcp_register_settings() {
     ];
     foreach ($protection_fields as $id => $label) {
         $desc = '';
-         if ($id === 'disable_video_download') {
-            $desc = __( 'Uses advanced techniques like Blob URLs and User-Agent blocking to prevent downloads from managers like IDM.', 'block-content-protection' );
-        }
         if ($id === 'disable_screenshot') {
             $desc = __( 'Blocks PrintScreen and macOS screenshot shortcuts (Cmd+Shift+3/4).', 'block-content-protection' );
         }
@@ -432,11 +386,6 @@ function bcp_enqueue_scripts() {
             wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.6' );
         }
 
-        // Enqueue blackout scripts if screen recording protection is enabled
-        if ( ! empty( $options['video_screen_record_block'] ) ) {
-            wp_enqueue_script( 'bcp-blackout-js', BCP_PLUGIN_URL . 'js/blackout.js', [], '1.6.6', true );
-            wp_enqueue_style( 'bcp-blackout-css', BCP_PLUGIN_URL . 'css/blackout.css', [], '1.6.6' );
-        }
     }
 }
 add_action( 'wp_enqueue_scripts', 'bcp_enqueue_scripts' );

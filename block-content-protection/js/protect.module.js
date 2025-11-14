@@ -136,37 +136,45 @@ const handleKeydown = (e) => {
 const handleScreenRecording = () => {
     if (!bcp_settings.video_screen_record_block) return;
 
-    // Black out video when tab loses focus
-    document.addEventListener('visibilitychange', () => {
-        const isPageHidden = document.hidden;
+    const startBlackout = () => {
         document.querySelectorAll('video').forEach(v => {
-            const wrapper = v.closest('.bcp-watermark-wrapper');
-            if (wrapper) {
-                if (isPageHidden) {
-                    wrapper.classList.add('bcp-recording-detected');
-                } else {
-                    wrapper.classList.remove('bcp-recording-detected');
-                }
-            }
+            v.closest('.bcp-watermark-wrapper')?.classList.add('bcp-recording-detected');
         });
+    };
+
+    const stopBlackout = () => {
+        document.querySelectorAll('.bcp-recording-detected').forEach(el => {
+            el.classList.remove('bcp-recording-detected');
+        });
+    };
+
+    // Black out video when tab loses focus or window is blurred
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            startBlackout();
+        } else {
+            stopBlackout();
+        }
     });
+    window.addEventListener('blur', startBlackout);
+    window.addEventListener('focus', stopBlackout);
+
 
     if (!navigator.mediaDevices?.getDisplayMedia) return;
 
     const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia;
     navigator.mediaDevices.getDisplayMedia = async function(...args) {
-        // When a recording attempt is detected, apply a class to blur the video
-        document.querySelectorAll('video').forEach(v => v.closest('.bcp-watermark-wrapper')?.classList.add('bcp-recording-detected'));
+        startBlackout(); // Apply blackout before the user sees the prompt
         try {
             const stream = await originalGetDisplayMedia.apply(this, args);
             // When the stream ends (user stops recording), remove the class
             stream.getTracks().forEach(track => {
-                track.onended = () => document.querySelectorAll('.bcp-recording-detected').forEach(el => el.classList.remove('bcp-recording-detected'));
+                track.onended = stopBlackout;
             });
             return stream;
         } catch (err) {
             // If the user cancels the recording, remove the class
-            document.querySelectorAll('.bcp-recording-detected').forEach(el => el.classList.remove('bcp-recording-detected'));
+            stopBlackout();
             throw err;
         }
     };
