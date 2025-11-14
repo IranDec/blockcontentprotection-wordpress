@@ -18,6 +18,164 @@ if ( ! defined( 'WPINC' ) ) {
 
 define( 'BCP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+/**
+ * Block access from known download managers by User-Agent.
+ * This provides a server-side layer of protection.
+ */
+function bcp_block_download_managers() {
+    $options = get_option( 'bcp_options', [] );
+
+    // Only run if the media download protection is enabled
+    if ( empty( $options['disable_media_download'] ) ) {
+        return;
+    }
+
+    // Check if the User-Agent is set
+    if ( ! isset( $_SERVER['HTTP_USER_AGENT'] ) ) {
+        return;
+    }
+
+    $user_agent = strtolower( $_SERVER['HTTP_USER_AGENT'] );
+    $blocked_agents = [ 'idm', 'internet download manager', 'flashget' ]; // Common download manager user agents
+
+    $is_blocked_agent = false;
+    foreach ( $blocked_agents as $agent ) {
+        if ( strpos( $user_agent, $agent ) !== false ) {
+            $is_blocked_agent = true;
+            break;
+        }
+    }
+
+    if ( $is_blocked_agent ) {
+        $request_uri = strtolower( $_SERVER['REQUEST_URI'] );
+        $media_extensions = [
+            // Video formats
+            '.mp4', '.webm', '.ogg', '.mov', '.flv', '.avi', '.mkv',
+            // Audio formats
+            '.mp3', '.wav', '.aac', '.flac', '.m4a'
+        ];
+
+        foreach ( $media_extensions as $ext ) {
+            if ( substr( $request_uri, -strlen( $ext ) ) === $ext ) {
+                header( 'HTTP/1.1 403 Forbidden' );
+                wp_die( 'Access to this media file is restricted.' );
+            }
+        }
+    }
+}
+add_action( 'init', 'bcp_block_download_managers' );
+
+/**
+ * Handles generating and validating expiring links for media files.
+ */
+function bcp_handle_media_request() {
+    // Check if the request is for a secure media link
+    if ( ! isset( $_GET['bcp_media_token'] ) || ! isset( $_GET['bcp_file_path'] ) ) {
+        return;
+    }
+
+    $token = sanitize_text_field( $_GET['bcp_media_token'] );
+    $file_path = sanitize_text_field( $_GET['bcp_file_path'] );
+    $expires = isset( $_GET['bcp_expires'] ) ? intval( $_GET['bcp_expires'] ) : 0;
+
+    // Validate the token
+    if ( ! bcp_validate_media_token( $file_path, $expires, $token ) ) {
+        wp_die( 'Invalid or expired media link.', 'Forbidden', [ 'response' => 403 ] );
+    }
+
+    // Serve the file
+    $upload_dir = wp_upload_dir();
+    $full_file_path = realpath( $upload_dir['basedir'] . '/' . $file_path );
+
+    // Security check: ensure the file is within the uploads directory
+    if ( ! $full_file_path || strpos( $full_file_path, realpath( $upload_dir['basedir'] ) ) !== 0 ) {
+        wp_die( 'Invalid file path.', 'Bad Request', [ 'response' => 400 ] );
+    }
+
+    if ( file_exists( $full_file_path ) ) {
+        $mime_type = wp_check_filetype( $full_file_path )['type'];
+        header( 'Content-Type: ' . $mime_type );
+        header( 'Content-Length: ' . filesize( $full_file_path ) );
+        header( 'Content-Disposition: inline; filename="' . basename( $full_file_path ) . '"' );
+        readfile( $full_file_path );
+        exit;
+    } else {
+        wp_die( 'File not found.', 'Not Found', [ 'response' => 404 ] );
+    }
+}
+add_action( 'init', 'bcp_handle_media_request' );
+
+/**
+ * Generates a secure token for a media link.
+ */
+function bcp_generate_media_token( $file_path, $expires ) {
+    $secret_key = defined( 'NONCE_KEY' ) ? NONCE_KEY : get_site_option( 'secret_key' );
+    $hash_data = $file_path . '|' . $expires . '|' . $secret_key;
+    return hash( 'sha256', $hash_data );
+}
+
+/**
+ * Validates a secure media token.
+ */
+function bcp_validate_media_token( $file_path, $expires, $token ) {
+    if ( time() > $expires ) {
+        return false; // Link has expired
+    }
+    return hash_equals( bcp_generate_media_token( $file_path, $expires ), $token );
+}
+
+/**
+ * Shortcode to embed protected media.
+ */
+function bcp_media_shortcode( $atts ) {
+    $atts = shortcode_atts( [
+        'src' => '',
+    ], $atts, 'bcp_media' );
+
+    $src = $atts['src'];
+    if ( empty( $src ) ) {
+        return '';
+    }
+
+    $options = get_option( 'bcp_options', [] );
+    if ( empty( $options['enable_expiring_links'] ) ) {
+        // If expiring links are disabled, just return the normal media tag
+        $filetype = wp_check_filetype( $src );
+        if ( strpos( $filetype['type'], 'video' ) !== false ) {
+            return '<video controls src="' . esc_url( $src ) . '"></video>';
+        } elseif ( strpos( $filetype['type'], 'audio' ) !== false ) {
+            return '<audio controls src="' . esc_url( $src ) . '"></audio>';
+        }
+        return '';
+    }
+
+    $upload_dir = wp_upload_dir();
+    if ( strpos( $src, $upload_dir['baseurl'] ) === false ) {
+        return ''; // Only protect local media
+    }
+
+    $file_path = ltrim( str_replace( $upload_dir['baseurl'], '', $src ), '/' );
+    $duration = ! empty( $options['expiring_links_duration'] ) ? intval( $options['expiring_links_duration'] ) : 3600;
+    $expires = time() + $duration;
+    $token = bcp_generate_media_token( $file_path, $expires );
+
+    $secure_url = add_query_arg( [
+        'bcp_file_path' => $file_path,
+        'bcp_expires'   => $expires,
+        'bcp_media_token' => $token,
+    ], home_url( '/' ) );
+
+    $filetype = wp_check_filetype( $src );
+    if ( strpos( $filetype['type'], 'video' ) !== false ) {
+        return '<video controls src="' . esc_url( $secure_url ) . '"></video>';
+    } elseif ( strpos( $filetype['type'], 'audio' ) !== false ) {
+        return '<audio controls src="' . esc_url( $secure_url ) . '"></audio>';
+    }
+
+    return '';
+}
+add_shortcode( 'bcp_media', 'bcp_media_shortcode' );
+
 function bcp_add_admin_menu() {
     add_menu_page(
         __( 'Content Protection', 'block-content-protection' ),
@@ -42,6 +200,7 @@ function bcp_register_settings() {
         'disable_copy'              => __( 'Disable Copy (Ctrl+C)', 'block-content-protection' ),
         'disable_text_selection'    => __( 'Disable Text Selection', 'block-content-protection' ),
         'disable_image_drag'        => __( 'Disable Image Dragging', 'block-content-protection' ),
+        'disable_media_download'    => __( 'Block Media Download (IDM, etc.)', 'block-content-protection' ),
         'disable_video_download'    => __( 'Disable Video Download', 'block-content-protection' ),
         'disable_screenshot'        => __( 'Disable Screenshot Shortcuts', 'block-content-protection' ),
         'enhanced_protection'       => __( 'Enhanced Screen Protection', 'block-content-protection' ),
@@ -50,6 +209,9 @@ function bcp_register_settings() {
     ];
     foreach ($protection_fields as $id => $label) {
         $desc = '';
+         if ($id === 'disable_media_download') {
+            $desc = __( 'Protects video and audio files. Uses advanced techniques like Blob URLs and User-Agent blocking to prevent downloads from managers like IDM.', 'block-content-protection' );
+        }
         if ($id === 'disable_screenshot') {
             $desc = __( 'Blocks PrintScreen and macOS screenshot shortcuts (Cmd+Shift+3/4).', 'block-content-protection' );
         }
@@ -81,6 +243,11 @@ function bcp_register_settings() {
     add_settings_field( 'enable_video_watermark', __( 'Enable Video Watermark', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'enable_video_watermark', 'description' => __( 'Enable this to show a dynamic watermark over videos.', 'block-content-protection' ) ] );
     // add_settings_field( 'enable_page_watermark', __( 'Enable Full Page Watermark', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'enable_page_watermark', 'description' => __( 'Enable this to show a dynamic watermark over the entire page.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_text', __( 'Watermark Text', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_text', 'description' => __( 'Enter text for the watermark. Use placeholders: {user_login}, {user_email}, {user_mobile}, {ip_address}, {date}.', 'block-content-protection' ) ] );
+
+    // Expiring Links Section
+    add_settings_section( 'bcp_expiring_links_section', __( 'Expiring Media Links', 'block-content-protection' ), null, 'block_content_protection' );
+    add_settings_field( 'enable_expiring_links', __( 'Enable Expiring Links', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'enable_expiring_links', 'description' => __( 'Enable to generate secure, time-sensitive links for media files.', 'block-content-protection' ) ] );
+    add_settings_field( 'expiring_links_duration', __( 'Link Expiration Time (seconds)', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'expiring_links_duration', 'description' => __( 'Set how long the media links should be valid. Default: 3600 seconds (1 hour).', 'block-content-protection' ), 'min' => 60, 'step' => 60 ] );
     add_settings_field( 'watermark_opacity', __( 'Watermark Opacity', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_opacity', 'description' => __( 'Set the opacity from 0 (transparent) to 1 (opaque). Default: 0.5', 'block-content-protection' ), 'min' => 0, 'max' => 1, 'step' => '0.1' ] );
     add_settings_field( 'watermark_animated', __( 'Enable Watermark Animation', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_animated', 'description' => __( 'Enable to make the watermark move across the video.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_position', __( 'Watermark Position', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_position', 'description' => __( 'Select the watermark position (only applies if animation is disabled).', 'block-content-protection' ), 'options' => [ 'top_left' => 'Top Left', 'top_right' => 'Top Right', 'bottom_left' => 'Bottom Left', 'bottom_right' => 'Bottom Right', ] ] );
@@ -159,10 +326,10 @@ function bcp_sanitize_options( $input ) {
     // Define all known checkbox fields.
     $checkboxes = [
         'disable_right_click', 'disable_devtools', 'disable_copy',
-        'disable_text_selection', 'disable_image_drag', 'disable_video_download',
+        'disable_text_selection', 'disable_image_drag', 'disable_media_download',
         'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block',
         'video_screen_record_block', 'enable_video_watermark', //'enable_page_watermark',
-        'enable_custom_messages', 'watermark_animated'
+        'enable_custom_messages', 'watermark_animated', 'enable_expiring_links'
     ];
 
     // For each checkbox, if it was submitted (checked), set to 1. Otherwise (unchecked), set to 0.
@@ -200,6 +367,9 @@ function bcp_sanitize_options( $input ) {
     if ( isset( $input['watermark_count'] ) ) {
         $new_options['watermark_count'] = intval( $input['watermark_count'] );
     }
+    if ( isset( $input['expiring_links_duration'] ) ) {
+        $new_options['expiring_links_duration'] = intval( $input['expiring_links_duration'] );
+    }
 
     return $new_options;
 }
@@ -236,6 +406,16 @@ function bcp_options_page() {
                         <div class="bcp-card-body">
                             <table class="form-table">
                                 <?php do_settings_fields( 'block_content_protection', 'bcp_watermark_section' ); ?>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Expiring Links Settings Card -->
+                    <div class="bcp-card">
+                        <h2 class="bcp-card-header"><?php _e( 'Expiring Media Links', 'block-content-protection' ); ?></h2>
+                        <div class="bcp-card-body">
+                            <table class="form-table">
+                                <?php do_settings_fields( 'block_content_protection', 'bcp_expiring_links_section' ); ?>
                             </table>
                         </div>
                     </div>
@@ -430,7 +610,7 @@ function bcp_activation() {
         'disable_copy'              => 1,
         'disable_text_selection'    => 1,
         'disable_image_drag'        => 1,
-        'disable_video_download'    => 1,
+        'disable_media_download'    => 1,
         'disable_screenshot'        => 1,
         'enhanced_protection'       => 0,
         'mobile_screenshot_block'   => 1,
@@ -442,6 +622,8 @@ function bcp_activation() {
         'enable_custom_messages'    => 0,
         'watermark_text'            => '',
         'enable_video_watermark'    => 0,
+        'enable_expiring_links'     => 0,
+        'expiring_links_duration'   => 3600,
         //'enable_page_watermark'     => 0,
         'watermark_opacity'         => 0.5,
         'watermark_animated'        => 1,

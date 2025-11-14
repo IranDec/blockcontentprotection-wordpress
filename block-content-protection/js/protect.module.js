@@ -9,57 +9,62 @@ if (settingsElement) {
     }
 }
 
-// Use a WeakSet to keep track of videos that have already been processed
-const processedVideos = new WeakSet();
+// Use a WeakSet to keep track of media that has already been processed
+const processedMedia = new WeakSet();
 
-// --- Core Video Protection Logic ---
-const protectVideo = (video) => {
-    // Exit if the video has already been processed or is marked as protected
-    if (processedVideos.has(video) || video.dataset.bcpProtected === 'true') return;
-    processedVideos.add(video);
-    video.dataset.bcpProtected = 'true';
+// --- Core Media Protection Logic ---
+const protectMedia = (media) => {
+    // Exit if the media has already been processed or is marked as protected
+    if (processedMedia.has(media) || media.dataset.bcpProtected === 'true') return;
+    processedMedia.add(media);
+    media.dataset.bcpProtected = 'true';
 
     // Disable native controls that are not needed
-    video.setAttribute('controlsList', 'nodownload');
-    video.setAttribute('disablePictureInPicture', 'true');
-
-    // Create a wrapper for the video and its watermark
-    let wrapper = document.createElement('div');
-    wrapper.classList.add('bcp-watermark-wrapper');
-    // Insert the wrapper before the video and then move the video inside it
-    video.parentNode.insertBefore(wrapper, video);
-    wrapper.appendChild(video);
-
-    // Apply watermark if enabled in settings
-    if (bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
-        applyWatermark(wrapper);
+    media.setAttribute('controlsList', 'nodownload');
+    if (media.tagName === 'VIDEO') {
+        media.setAttribute('disablePictureInPicture', 'true');
     }
 
-    // Add the custom fullscreen button
-    addCustomFullscreenButton(wrapper);
+    let wrapper;
+    if (media.tagName === 'VIDEO') {
+        wrapper = document.createElement('div');
+        wrapper.classList.add('bcp-watermark-wrapper');
+        media.parentNode.insertBefore(wrapper, media);
+        wrapper.appendChild(media);
+    } else {
+        wrapper = media;
+    }
 
-    // Secure the video source if download protection is enabled
-    if (bcp_settings.disable_video_download) {
-        protectVideoSource(video);
+    // Apply watermark if enabled in settings
+    if (media.tagName === 'VIDEO' && bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
+        applyWatermark(wrapper);
+        addCustomFullscreenButton(wrapper);
+    }
+
+    // Secure the media source if download protection is enabled
+    if (bcp_settings.disable_media_download) {
+        protectMediaSource(media);
     }
 };
 
-const protectVideoSource = (video) => {
-    const originalSrc = video.getAttribute('src') || video.querySelector('source')?.getAttribute('src');
-    // Only process if there's a source and it's not already a blob URL
+const protectMediaSource = (media) => {
+    // If expiring links are enabled, the URL is already secure. Don't convert to Blob.
+    if (bcp_settings.enable_expiring_links) {
+        return;
+    }
+    const originalSrc = media.getAttribute('src') || media.querySelector('source')?.getAttribute('src');
     if (originalSrc && !originalSrc.startsWith('blob:')) {
-        // Fetch the video as a blob to obscure the direct URL
         fetch(originalSrc, { credentials: 'omit' })
             .then(response => {
-                if (!response.ok) throw new Error(`BCP: Network error fetching video: ${response.statusText}`);
+                if (!response.ok) throw new Error(`BCP: Network error fetching media: ${response.statusText}`);
                 return response.blob();
             })
             .then(blob => {
-                video.src = URL.createObjectURL(blob);
+                media.src = URL.createObjectURL(blob);
             })
             .catch(err => {
                 console.error('BCP Error:', err);
-                video.setAttribute('src', originalSrc); // Restore original source on failure
+                media.setAttribute('src', originalSrc); // Restore original source on failure
             });
     }
 }
@@ -182,8 +187,8 @@ const handleScreenRecording = () => {
 
 // --- Initialization ---
 const initProtection = () => {
-    // Apply protection to all existing video elements on the page
-    document.querySelectorAll('video').forEach(protectVideo);
+    // Apply protection to all existing video and audio elements on the page
+    document.querySelectorAll('video, audio').forEach(protectMedia);
     // Disable text selection if enabled
     if (bcp_settings.disable_text_selection) {
         document.body.style.cssText += 'user-select:none;-webkit-user-select:none;';
@@ -199,11 +204,11 @@ const observer = new MutationObserver(mutations => {
     mutations.forEach(mutation => {
         mutation.addedNodes.forEach(node => {
             if (node.nodeType === 1) { // Element node
-                if (node.tagName === 'VIDEO') {
-                    protectVideo(node);
+                if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO') {
+                    protectMedia(node);
                 } else {
-                    // Also check for videos within newly added complex elements
-                    node.querySelectorAll?.('video').forEach(protectVideo);
+                    // Also check for media within newly added complex elements
+                    node.querySelectorAll?.('video, audio').forEach(protectMedia);
                 }
             }
         });
