@@ -19,89 +19,72 @@ if ( ! defined( 'WPINC' ) ) {
 define( 'BCP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 /**
- * Block access from known download managers by User-Agent.
- * This provides a server-side layer of protection.
- */
-function bcp_block_download_managers() {
-    $options = get_option( 'bcp_options', [] );
-
-    // Only run if the media download protection is enabled
-    if ( empty( $options['disable_media_download'] ) ) {
-        return;
-    }
-
-    // Check if the User-Agent is set
-    if ( ! isset( $_SERVER['HTTP_USER_AGENT'] ) ) {
-        return;
-    }
-
-    $user_agent = strtolower( $_SERVER['HTTP_USER_AGENT'] );
-    $blocked_agents = [ 'idm', 'internet download manager', 'flashget' ]; // Common download manager user agents
-
-    $is_blocked_agent = false;
-    foreach ( $blocked_agents as $agent ) {
-        if ( strpos( $user_agent, $agent ) !== false ) {
-            $is_blocked_agent = true;
-            break;
-        }
-    }
-
-    if ( $is_blocked_agent ) {
-        $request_uri = strtolower( $_SERVER['REQUEST_URI'] );
-        $media_extensions = [
-            // Video formats
-            '.mp4', '.webm', '.ogg', '.mov', '.flv', '.avi', '.mkv',
-            // Audio formats
-            '.mp3', '.wav', '.aac', '.flac', '.m4a'
-        ];
-
-        foreach ( $media_extensions as $ext ) {
-            if ( substr( $request_uri, -strlen( $ext ) ) === $ext ) {
-                header( 'HTTP/1.1 403 Forbidden' );
-                wp_die( 'Access to this media file is restricted.' );
-            }
-        }
-    }
-}
-add_action( 'init', 'bcp_block_download_managers' );
-
-/**
  * Handles generating and validating expiring links for media files.
  */
 function bcp_handle_media_request() {
     // Check if the request is for a secure media link
-    if ( ! isset( $_GET['bcp_media_token'] ) || ! isset( $_GET['bcp_file_path'] ) ) {
+    if ( ! isset( $_GET['bcp_media_token'] ) || ! isset( $_GET['bcp_media_src'] ) ) {
         return;
     }
 
+    // Block download managers
+    $options = get_option( 'bcp_options', [] );
+    if ( ! empty( $options['disable_media_download'] ) && isset( $_SERVER['HTTP_USER_AGENT'] ) ) {
+        $user_agent = strtolower( $_SERVER['HTTP_USER_AGENT'] );
+        $blocked_agents = [ 'idm', 'internet download manager', 'flashget' ];
+        foreach ( $blocked_agents as $agent ) {
+            if ( strpos( $user_agent, $agent ) !== false ) {
+                wp_die( 'Access to this media file is restricted.', 'Forbidden', [ 'response' => 403 ] );
+            }
+        }
+    }
+
     $token = sanitize_text_field( $_GET['bcp_media_token'] );
-    $file_path = sanitize_text_field( $_GET['bcp_file_path'] );
+    $encoded_src = sanitize_text_field( $_GET['bcp_media_src'] );
     $expires = isset( $_GET['bcp_expires'] ) ? intval( $_GET['bcp_expires'] ) : 0;
 
     // Validate the token
-    if ( ! bcp_validate_media_token( $file_path, $expires, $token ) ) {
+    if ( ! bcp_validate_media_token( $encoded_src, $expires, $token ) ) {
         wp_die( 'Invalid or expired media link.', 'Forbidden', [ 'response' => 403 ] );
     }
 
+    $media_url = rawurldecode( $encoded_src );
+
     // Serve the file
     $upload_dir = wp_upload_dir();
-    $full_file_path = realpath( $upload_dir['basedir'] . '/' . $file_path );
+    if ( strpos( $media_url, $upload_dir['baseurl'] ) !== false ) {
+        // Local file
+        $file_path = ltrim( str_replace( $upload_dir['baseurl'], '', $media_url ), '/' );
+        $full_file_path = realpath( $upload_dir['basedir'] . '/' . $file_path );
 
-    // Security check: ensure the file is within the uploads directory
-    if ( ! $full_file_path || strpos( $full_file_path, realpath( $upload_dir['basedir'] ) ) !== 0 ) {
-        wp_die( 'Invalid file path.', 'Bad Request', [ 'response' => 400 ] );
-    }
+        if ( ! $full_file_path || strpos( $full_file_path, realpath( $upload_dir['basedir'] ) ) !== 0 ) {
+            wp_die( 'Invalid file path.', 'Bad Request', [ 'response' => 400 ] );
+        }
 
-    if ( file_exists( $full_file_path ) ) {
-        $mime_type = wp_check_filetype( $full_file_path )['type'];
-        header( 'Content-Type: ' . $mime_type );
-        header( 'Content-Length: ' . filesize( $full_file_path ) );
-        header( 'Content-Disposition: inline; filename="' . basename( $full_file_path ) . '"' );
-        readfile( $full_file_path );
-        exit;
+        if ( file_exists( $full_file_path ) ) {
+            $mime_type = wp_check_filetype( $full_file_path )['type'];
+            header( 'Content-Type: ' . $mime_type );
+            header( 'Content-Length: ' . filesize( $full_file_path ) );
+            header( 'Content-Disposition: inline; filename="' . basename( $full_file_path ) . '"' );
+            readfile( $full_file_path );
+            exit;
+        }
     } else {
-        wp_die( 'File not found.', 'Not Found', [ 'response' => 404 ] );
+        // External file (proxy)
+        $response = wp_remote_get( $media_url, [ 'stream' => true ] );
+        if ( ! is_wp_error( $response ) && $response['response']['code'] === 200 ) {
+            header( 'Content-Type: ' . $response['headers']['content-type'] );
+            if ( isset( $response['headers']['content-length'] ) ) {
+                header( 'Content-Length: ' . $response['headers']['content-length'] );
+            }
+            echo wp_remote_retrieve_body( $response );
+            exit;
+        } else {
+            wp_die( 'Could not retrieve remote file.', 'Not Found', [ 'response' => 404 ] );
+        }
     }
+
+    wp_die( 'File not found.', 'Not Found', [ 'response' => 404 ] );
 }
 add_action( 'init', 'bcp_handle_media_request' );
 
@@ -149,18 +132,14 @@ function bcp_media_shortcode( $atts ) {
         return '';
     }
 
-    $upload_dir = wp_upload_dir();
-    if ( strpos( $src, $upload_dir['baseurl'] ) === false ) {
-        return ''; // Only protect local media
-    }
-
-    $file_path = ltrim( str_replace( $upload_dir['baseurl'], '', $src ), '/' );
     $duration = ! empty( $options['expiring_links_duration'] ) ? intval( $options['expiring_links_duration'] ) : 3600;
     $expires = time() + $duration;
-    $token = bcp_generate_media_token( $file_path, $expires );
+    // URL-safe encoding for the src
+    $encoded_src = rawurlencode( $src );
+    $token = bcp_generate_media_token( $encoded_src, $expires );
 
     $secure_url = add_query_arg( [
-        'bcp_file_path' => $file_path,
+        'bcp_media_src' => $encoded_src,
         'bcp_expires'   => $expires,
         'bcp_media_token' => $token,
     ], home_url( '/' ) );
@@ -201,7 +180,6 @@ function bcp_register_settings() {
         'disable_text_selection'    => __( 'Disable Text Selection', 'block-content-protection' ),
         'disable_image_drag'        => __( 'Disable Image Dragging', 'block-content-protection' ),
         'disable_media_download'    => __( 'Block Media Download (IDM, etc.)', 'block-content-protection' ),
-        'disable_video_download'    => __( 'Disable Video Download', 'block-content-protection' ),
         'disable_screenshot'        => __( 'Disable Screenshot Shortcuts', 'block-content-protection' ),
         'enhanced_protection'       => __( 'Enhanced Screen Protection', 'block-content-protection' ),
         'mobile_screenshot_block'   => __( 'Block Mobile Screenshots', 'block-content-protection' ),
@@ -565,7 +543,6 @@ function bcp_enqueue_scripts() {
         if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) ) {
             wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.6' );
         }
-
     }
 }
 add_action( 'wp_enqueue_scripts', 'bcp_enqueue_scripts' );
