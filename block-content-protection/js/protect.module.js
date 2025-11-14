@@ -48,12 +48,14 @@ const protectMedia = (media) => {
 };
 
 const protectMediaSource = (media) => {
-    // If expiring links are enabled, the URL is already secure. Don't convert to Blob.
-    if (bcp_settings.enable_expiring_links) {
+    const originalSrc = media.getAttribute('src') || media.querySelector('source')?.getAttribute('src');
+
+    // If the URL is already a secure link from the server, don't convert it to a Blob.
+    if (originalSrc && (originalSrc.includes('bcp_media_token=') || originalSrc.startsWith('blob:'))) {
         return;
     }
-    const originalSrc = media.getAttribute('src') || media.querySelector('source')?.getAttribute('src');
-    if (originalSrc && !originalSrc.startsWith('blob:')) {
+
+    if (originalSrc) {
         fetch(originalSrc, { credentials: 'omit' })
             .then(response => {
                 if (!response.ok) throw new Error(`BCP: Network error fetching media: ${response.statusText}`);
