@@ -201,6 +201,7 @@ function bcp_register_settings() {
         'disable_text_selection'    => __( 'Disable Text Selection', 'block-content-protection' ),
         'disable_image_drag'        => __( 'Disable Image Dragging', 'block-content-protection' ),
         'disable_media_download'    => __( 'Block Media Download (IDM, etc.)', 'block-content-protection' ),
+        'disable_video_download'    => __( 'Disable Video Download', 'block-content-protection' ),
         'disable_screenshot'        => __( 'Disable Screenshot Shortcuts', 'block-content-protection' ),
         'enhanced_protection'       => __( 'Enhanced Screen Protection', 'block-content-protection' ),
         'mobile_screenshot_block'   => __( 'Block Mobile Screenshots', 'block-content-protection' ),
@@ -564,6 +565,7 @@ function bcp_enqueue_scripts() {
         if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) ) {
             wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.6' );
         }
+
     }
 }
 add_action( 'wp_enqueue_scripts', 'bcp_enqueue_scripts' );
