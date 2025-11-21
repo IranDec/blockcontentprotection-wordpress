@@ -73,7 +73,8 @@ function bcp_handle_media_request() {
     }
 
     // Validate the token
-    if ( ! bcp_validate_media_token( $encoded_src, $expires, $token ) ) {
+    $ip_address = isset( $_GET['bcp_ip'] ) ? sanitize_text_field( $_GET['bcp_ip'] ) : '';
+    if ( ! bcp_validate_media_token( $encoded_src, $expires, $token, $ip_address ) ) {
         wp_die( 'Invalid or expired media link.', 'Forbidden', [ 'response' => 403 ] );
     }
 
@@ -120,20 +121,42 @@ add_action( 'init', 'bcp_handle_media_request' );
 /**
  * Generates a secure token for a media link.
  */
-function bcp_generate_media_token( $file_path, $expires ) {
+function bcp_generate_media_token( $file_path, $expires, $ip_address = '' ) {
+    $options = get_option( 'bcp_options', [] );
     $secret_key = defined( 'NONCE_KEY' ) ? NONCE_KEY : get_site_option( 'secret_key' );
     $hash_data = $file_path . '|' . $expires . '|' . $secret_key;
+    if ( ! empty( $options['enable_ip_binding'] ) && ! empty( $ip_address ) ) {
+        $hash_data .= '|' . $ip_address;
+    }
     return hash( 'sha256', $hash_data );
 }
+
 
 /**
  * Validates a secure media token.
  */
-function bcp_validate_media_token( $file_path, $expires, $token ) {
+function bcp_validate_media_token( $file_path, $expires, $token, $ip_address = '' ) {
+    $options = get_option( 'bcp_options', [] );
     if ( time() > $expires ) {
         return false; // Link has expired
     }
-    return hash_equals( bcp_generate_media_token( $file_path, $expires ), $token );
+
+    $current_ip = bcp_get_user_ip();
+
+    // Check if the IP address matches, but only if the setting is enabled
+    if ( ! empty( $options['enable_ip_binding'] ) ) {
+        if ( $current_ip !== $ip_address ) {
+            return false;
+        }
+        // Regenerate the token with the IP for validation
+        $expected_token = bcp_generate_media_token( $file_path, $expires, $current_ip );
+    } else {
+        // Regenerate the token without the IP for validation
+        $expected_token = bcp_generate_media_token( $file_path, $expires );
+    }
+
+
+    return hash_equals( $expected_token, $token );
 }
 
 /**
@@ -153,13 +176,22 @@ function bcp_get_media_url( $src ) {
     $duration = ! empty( $options['expiring_links_duration'] ) ? intval( $options['expiring_links_duration'] ) : 3600;
     $expires = time() + $duration;
     $encoded_src = rawurlencode( $src );
-    $token = bcp_generate_media_token( $encoded_src, $expires );
 
     $args = [
         'bcp_media_src' => $encoded_src,
         'bcp_expires'   => $expires,
-        'bcp_media_token' => $token,
     ];
+
+    if ( ! empty( $options['enable_ip_binding'] ) ) {
+        $ip_address = bcp_get_user_ip();
+        $args['bcp_ip'] = $ip_address;
+        $token = bcp_generate_media_token( $encoded_src, $expires, $ip_address );
+    } else {
+        $token = bcp_generate_media_token( $encoded_src, $expires );
+    }
+
+     $args['bcp_media_token'] = $token;
+
 
     if ( ! empty( $options['enable_device_limit'] ) ) {
         // The device ID will be generated and added by the frontend JS.
@@ -301,6 +333,7 @@ function bcp_register_settings() {
     add_settings_field( 'enable_expiring_links', __( 'Enable Expiring Links', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'enable_expiring_links', 'description' => __( 'Enable to generate secure, time-sensitive links for media files.', 'block-content-protection' ) ] );
     add_settings_field( 'enable_automatic_protection', __( 'Enable Automatic Protection', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'enable_automatic_protection', 'description' => __( 'Automatically protect all video and audio tags in your content. If disabled, you must use the [bcp_media] shortcode.', 'block-content-protection' ) ] );
     add_settings_field( 'expiring_links_duration', __( 'Link Expiration Time (seconds)', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'expiring_links_duration', 'description' => __( 'Set how long the media links should be valid. Default: 3600 seconds (1 hour).', 'block-content-protection' ), 'min' => 60, 'step' => 60 ] );
+    add_settings_field( 'enable_ip_binding', __( 'Bind Secure Links to User IP', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'enable_ip_binding', 'description' => __( 'For the highest security, bind the expiring link to the user\'s IP address. Prevents sharing links but may cause issues for users with dynamic IPs.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_opacity', __( 'Watermark Opacity', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_opacity', 'description' => __( 'Set the opacity from 0 (transparent) to 1 (opaque). Default: 0.5', 'block-content-protection' ), 'min' => 0, 'max' => 1, 'step' => '0.1' ] );
     add_settings_field( 'watermark_animated', __( 'Enable Watermark Animation', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_animated', 'description' => __( 'Enable to make the watermark move across the video.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_position', __( 'Watermark Position', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_position', 'description' => __( 'Select the watermark position (only applies if animation is disabled).', 'block-content-protection' ), 'options' => [ 'top_left' => 'Top Left', 'top_right' => 'Top Right', 'bottom_left' => 'Bottom Left', 'bottom_right' => 'Bottom Right', ] ] );
@@ -388,7 +421,7 @@ function bcp_sanitize_options( $input ) {
         'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block',
         'video_screen_record_block', 'enable_video_watermark', //'enable_page_watermark',
         'enable_custom_messages', 'watermark_animated', 'enable_expiring_links',
-        'enable_automatic_protection', 'enable_device_limit'
+        'enable_automatic_protection', 'enable_device_limit', 'enable_ip_binding'
     ];
 
     // For each checkbox, if it was submitted (checked), set to 1. Otherwise (unchecked), set to 0.
@@ -704,6 +737,7 @@ function bcp_activation() {
         'watermark_count'           => 30,
         'enable_device_limit'       => 0,
         'device_limit_count'        => 2,
+        'enable_ip_binding'         => 1, // Enabled by default
     ];
     if ( false === get_option( 'bcp_options' ) ) {
         update_option( 'bcp_options', $defaults );
