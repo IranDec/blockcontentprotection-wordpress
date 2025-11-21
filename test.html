@@ -6,29 +6,17 @@
     <link rel="stylesheet" href="block-content-protection/css/protect.css">
 </head>
 <body>
-    <h1>Video Watermark & Auto-Protection Test</h1>
-    <!-- This video tag simulates the output after the the_content filter has run -->
-    <video controls width="600" src="https://www.w3schools.com/html/mov_bbb.mp4?bcp_media_src=https%3A%2F%2Fwww.w3schools.com%2Fhtml%2Fmov_bbb.mp4&bcp_expires=9999999999&bcp_media_token=test-token" type="video/mp4">
+    <h1>Screen Recording Blackout Test</h1>
+    <video controls width="600" src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
         Your browser does not support the video tag.
     </video>
 
-    <h1>Audio Auto-Protection Test</h1>
-    <!-- This audio tag simulates the output after the the_content filter has run -->
-    <audio controls src="https://www.w3schools.com/html/horse.ogg?bcp_media_src=https%3A%2F%2Fwww.w3schools.com%2Fhtml%2Fhorse.ogg&bcp_expires=9999999999&bcp_media_token=test-token" type="audio/ogg">
-        Your browser does not support the audio tag.
-    </audio>
-
     <script type="application/json" id="bcp-settings-data">
         {
-            "enable_video_watermark": 1,
-            "watermark_text": "Academy-Tech.ir",
-            "watermark_animated": 1,
-            "watermark_opacity": 0.7,
-            "watermark_count": 20,
-            "watermark_style": "pattern",
-            "disable_media_download": 1,
-            "enable_expiring_links": 1,
-            "enable_automatic_protection": 1
+            "enable_video_watermark": 0,
+            "disable_media_download": 0,
+            "enable_expiring_links": 0,
+            "video_screen_record_block": 1
         }
     </script>
     <script src="block-content-protection/js/protect.module.js" type="module"></script>
