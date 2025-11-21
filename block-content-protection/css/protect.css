@@ -133,7 +133,7 @@ video::-webkit-media-controls-panel [role="button"][aria-label~="fullscreen" i] 
 }
 
 /* --- Screen Recording/Screenshot Protection --- */
-.bcp-recording-detected > video {
+.bcp-recording-detected video {
     filter: brightness(0) !important;
 }
 

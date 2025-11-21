@@ -43,6 +43,35 @@ function bcp_handle_media_request() {
     $encoded_src = sanitize_text_field( $_GET['bcp_media_src'] );
     $expires = isset( $_GET['bcp_expires'] ) ? intval( $_GET['bcp_expires'] ) : 0;
 
+    // --- Device Limit Check ---
+    if ( ! empty( $options['enable_device_limit'] ) ) {
+        if ( ! is_user_logged_in() ) {
+            wp_die( 'You must be logged in to view this content.', 'Unauthorized', [ 'response' => 401 ] );
+        }
+
+        $device_id = isset( $_GET['bcp_device_id'] ) ? sanitize_text_field( $_GET['bcp_device_id'] ) : '';
+        if ( empty( $device_id ) ) {
+            wp_die( 'Invalid device ID.', 'Bad Request', [ 'response' => 400 ] );
+        }
+
+        $user_id = get_current_user_id();
+        $active_devices = get_user_meta( $user_id, 'bcp_active_devices', true );
+        if ( ! is_array( $active_devices ) ) {
+            $active_devices = [];
+        }
+
+        $limit = ! empty( $options['device_limit_count'] ) ? intval( $options['device_limit_count'] ) : 2;
+
+        if ( ! in_array( $device_id, $active_devices, true ) ) {
+            if ( count( $active_devices ) >= $limit ) {
+                wp_die( 'You have reached your device limit. Please remove an existing device to add a new one.', 'Forbidden', [ 'response' => 403 ] );
+            } else {
+                $active_devices[] = $device_id;
+                update_user_meta( $user_id, 'bcp_active_devices', $active_devices );
+            }
+        }
+    }
+
     // Validate the token
     if ( ! bcp_validate_media_token( $encoded_src, $expires, $token ) ) {
         wp_die( 'Invalid or expired media link.', 'Forbidden', [ 'response' => 403 ] );
@@ -126,11 +155,19 @@ function bcp_get_media_url( $src ) {
     $encoded_src = rawurlencode( $src );
     $token = bcp_generate_media_token( $encoded_src, $expires );
 
-    return add_query_arg( [
+    $args = [
         'bcp_media_src' => $encoded_src,
         'bcp_expires'   => $expires,
         'bcp_media_token' => $token,
-    ], home_url( '/' ) );
+    ];
+
+    if ( ! empty( $options['enable_device_limit'] ) ) {
+        // The device ID will be generated and added by the frontend JS.
+        // We add a placeholder here which the JS will replace.
+        $args['bcp_device_id'] = '{DEVICE_ID}';
+    }
+
+    return add_query_arg( $args, home_url( '/' ) );
 }
 
 /**
@@ -269,6 +306,11 @@ function bcp_register_settings() {
     add_settings_field( 'watermark_position', __( 'Watermark Position', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_position', 'description' => __( 'Select the watermark position (only applies if animation is disabled).', 'block-content-protection' ), 'options' => [ 'top_left' => 'Top Left', 'top_right' => 'Top Right', 'bottom_left' => 'Bottom Left', 'bottom_right' => 'Bottom Right', ] ] );
     add_settings_field( 'watermark_style', __( 'Watermark Style', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_style', 'description' => __( 'Select the watermark style.', 'block-content-protection' ), 'options' => [ 'text' => 'Simple Text', 'pattern' => 'Pattern' ] ] );
     add_settings_field( 'watermark_count', __( 'Watermark Count', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_count', 'description' => __( 'Number of watermarks to display (for pattern style). Default: 30', 'block-content-protection' ), 'min' => 1, 'max' => 100, 'step' => 1 ] );
+
+    // Device Limit Section
+    add_settings_section( 'bcp_device_limit_section', __( 'Device Limit Settings', 'block-content-protection' ), null, 'block_content_protection' );
+    add_settings_field( 'enable_device_limit', __( 'Enable Device Limit', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'enable_device_limit', 'description' => __( 'Limit the number of devices a user can use to access media.', 'block-content-protection' ) ] );
+    add_settings_field( 'device_limit_count', __( 'Device Limit Count', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'device_limit_count', 'description' => __( 'Set the maximum number of allowed devices per user. Default: 2', 'block-content-protection' ), 'min' => 1, 'step' => 1 ] );
 }
 add_action( 'admin_init', 'bcp_register_settings' );
 
@@ -346,7 +388,7 @@ function bcp_sanitize_options( $input ) {
         'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block',
         'video_screen_record_block', 'enable_video_watermark', //'enable_page_watermark',
         'enable_custom_messages', 'watermark_animated', 'enable_expiring_links',
-        'enable_automatic_protection'
+        'enable_automatic_protection', 'enable_device_limit'
     ];
 
     // For each checkbox, if it was submitted (checked), set to 1. Otherwise (unchecked), set to 0.
@@ -386,6 +428,9 @@ function bcp_sanitize_options( $input ) {
     }
     if ( isset( $input['expiring_links_duration'] ) ) {
         $new_options['expiring_links_duration'] = intval( $input['expiring_links_duration'] );
+    }
+    if ( isset( $input['device_limit_count'] ) ) {
+        $new_options['device_limit_count'] = intval( $input['device_limit_count'] );
     }
 
     return $new_options;
@@ -433,6 +478,16 @@ function bcp_options_page() {
                         <div class="bcp-card-body">
                             <table class="form-table">
                                 <?php do_settings_fields( 'block_content_protection', 'bcp_expiring_links_section' ); ?>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Device Limit Settings Card -->
+                    <div class="bcp-card">
+                        <h2 class="bcp-card-header"><?php _e( 'Device Limit Settings', 'block-content-protection' ); ?></h2>
+                        <div class="bcp-card-body">
+                            <table class="form-table">
+                                <?php do_settings_fields( 'block_content_protection', 'bcp_device_limit_section' ); ?>
                             </table>
                         </div>
                     </div>
@@ -647,6 +702,8 @@ function bcp_activation() {
         'watermark_position'        => 'top_left',
         'watermark_style'           => 'text',
         'watermark_count'           => 30,
+        'enable_device_limit'       => 0,
+        'device_limit_count'        => 2,
     ];
     if ( false === get_option( 'bcp_options' ) ) {
         update_option( 'bcp_options', $defaults );

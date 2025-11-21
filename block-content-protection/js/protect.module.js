@@ -12,6 +12,17 @@ if (settingsElement) {
 // Use a WeakSet to keep track of media that has already been processed
 const processedMedia = new WeakSet();
 
+// --- Device ID Management ---
+const getDeviceId = () => {
+    let deviceId = localStorage.getItem('bcp_device_id');
+    if (!deviceId) {
+        // Generate a simple unique ID
+        deviceId = 'bcp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('bcp_device_id', deviceId);
+    }
+    return deviceId;
+};
+
 // --- Core Media Protection Logic ---
 const protectMedia = (media) => {
     // Exit if the media has already been processed or is marked as protected
@@ -39,6 +50,26 @@ const protectMedia = (media) => {
     if (media.tagName === 'VIDEO' && bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
         applyWatermark(wrapper);
         addCustomFullscreenButton(wrapper);
+    }
+
+    // --- Device ID Handling for Media URLs ---
+    if (bcp_settings.enable_device_limit) {
+        const deviceId = getDeviceId();
+        const placeholder = '{DEVICE_ID}';
+
+        // Replace placeholder in the main src attribute
+        const currentSrc = media.getAttribute('src');
+        if (currentSrc && currentSrc.includes(placeholder)) {
+            media.setAttribute('src', currentSrc.replace(placeholder, deviceId));
+        }
+
+        // Replace placeholder in any <source> elements
+        media.querySelectorAll('source').forEach(source => {
+            const sourceSrc = source.getAttribute('src');
+            if (sourceSrc && sourceSrc.includes(placeholder)) {
+                source.setAttribute('src', sourceSrc.replace(placeholder, deviceId));
+            }
+        });
     }
 
     // Secure the media source if download protection is enabled
