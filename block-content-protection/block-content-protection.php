@@ -182,16 +182,13 @@ function bcp_get_media_url( $src ) {
         'bcp_expires'   => $expires,
     ];
 
+    $ip_address = '';
     if ( ! empty( $options['enable_ip_binding'] ) ) {
         $ip_address = bcp_get_user_ip();
         $args['bcp_ip'] = $ip_address;
-        $token = bcp_generate_media_token( $encoded_src, $expires, $ip_address );
-    } else {
-        $token = bcp_generate_media_token( $encoded_src, $expires );
     }
-
-     $args['bcp_media_token'] = $token;
-
+    $token = bcp_generate_media_token( $encoded_src, $expires, $ip_address );
+    $args['bcp_media_token'] = $token;
 
     if ( ! empty( $options['enable_device_limit'] ) ) {
         // The device ID will be generated and added by the frontend JS.
