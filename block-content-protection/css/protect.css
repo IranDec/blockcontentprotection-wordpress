@@ -19,6 +19,7 @@
 
 /* --- Custom Video Player UI --- */
 .bcp-custom-controls {
+    z-index: 10000;
     position: absolute;
     bottom: 0;
     left: 0;
