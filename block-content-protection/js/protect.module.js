@@ -49,7 +49,7 @@ const protectMedia = (media) => {
     // Apply watermark if enabled in settings
     if (media.tagName === 'VIDEO' && bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
         applyWatermark(wrapper);
-        addCustomFullscreenButton(wrapper);
+        addCustomControls(wrapper);
     }
 
     // --- Device ID Handling for Media URLs ---
@@ -129,15 +129,39 @@ const applyWatermark = (wrapper) => {
     wrapper.appendChild(element);
 };
 
-const addCustomFullscreenButton = (wrapper) => {
-    const button = document.createElement('button');
-    button.className = 'bcp-custom-fullscreen-btn';
-    button.setAttribute('aria-label', 'Enter Fullscreen');
-    button.innerHTML = '<svg viewbox="0 0 18 18"><path d="M4.5 11H3v4h4v-1.5H4.5V11zM3 7h1.5V4.5H7V3H3v4zm10.5 6.5H11V15h4v-4h-1.5v2.5zM11 3v1.5h2.5V7H15V3h-4z"></path></svg>';
-    wrapper.appendChild(button);
+const addCustomControls = (wrapper) => {
+    const video = wrapper.querySelector('video');
+    if (!video) return;
 
-    // Handle cross-browser fullscreen requests
-    button.addEventListener('click', () => {
+    const controlsContainer = document.createElement('div');
+    controlsContainer.className = 'bcp-custom-controls';
+
+    // Seek Backward Button
+    const seekBackwardBtn = document.createElement('button');
+    seekBackwardBtn.className = 'bcp-custom-seek-btn';
+    seekBackwardBtn.setAttribute('aria-label', 'Seek Backward 5 seconds');
+    seekBackwardBtn.innerHTML = '<svg viewbox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"></path></svg>';
+    seekBackwardBtn.addEventListener('click', () => {
+        video.currentTime = Math.max(0, video.currentTime - 5);
+    });
+    controlsContainer.appendChild(seekBackwardBtn);
+
+    // Seek Forward Button
+    const seekForwardBtn = document.createElement('button');
+    seekForwardBtn.className = 'bcp-custom-seek-btn';
+    seekForwardBtn.setAttribute('aria-label', 'Seek Forward 5 seconds');
+    seekForwardBtn.innerHTML = '<svg viewbox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"></path></svg>';
+    seekForwardBtn.addEventListener('click', () => {
+        video.currentTime = Math.min(video.duration, video.currentTime + 5);
+    });
+    controlsContainer.appendChild(seekForwardBtn);
+
+    // Fullscreen Button
+    const fullscreenBtn = document.createElement('button');
+    fullscreenBtn.className = 'bcp-custom-fullscreen-btn';
+    fullscreenBtn.setAttribute('aria-label', 'Enter Fullscreen');
+    fullscreenBtn.innerHTML = '<svg viewbox="0 0 18 18"><path d="M4.5 11H3v4h4v-1.5H4.5V11zM3 7h1.5V4.5H7V3H3v4zm10.5 6.5H11V15h4v-4h-1.5v2.5zM11 3v1.5h2.5V7H15V3h-4z"></path></svg>';
+    fullscreenBtn.addEventListener('click', () => {
         if (!document.fullscreenElement && !document.webkitFullscreenElement) {
             if (wrapper.requestFullscreen) wrapper.requestFullscreen();
             else if (wrapper.webkitRequestFullscreen) wrapper.webkitRequestFullscreen();
@@ -146,6 +170,9 @@ const addCustomFullscreenButton = (wrapper) => {
             else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
         }
     });
+    controlsContainer.appendChild(fullscreenBtn);
+
+    wrapper.appendChild(controlsContainer);
 };
 
 // --- General Protection Event Handlers ---
