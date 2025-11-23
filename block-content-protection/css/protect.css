@@ -17,39 +17,73 @@
     pointer-events: auto;
 }
 
-/* Custom Controls Container */
+/* --- Custom Video Player UI --- */
 .bcp-custom-controls {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 5px;
+    padding: 10px;
     background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
     opacity: 0;
-    transition: opacity 0.2s ease-in-out;
+    transition: opacity 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Show controls on hover */
 .bcp-watermark-wrapper:hover .bcp-custom-controls {
     opacity: 1;
 }
 
-/* Style for all custom buttons */
+.bcp-timeline {
+    width: 100%;
+    height: 4px;
+    background-color: rgba(255,255,255,0.3);
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+
+.bcp-progress {
+    width: 0%;
+    height: 100%;
+    background-color: #fff;
+}
+
+.bcp-bottom-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.bcp-left-controls, .bcp-right-controls {
+    display: flex;
+    align-items: center;
+}
+
 .bcp-custom-controls button {
-    background: transparent;
+    background: none;
     border: none;
     cursor: pointer;
-    padding: 5px;
+    padding: 0 8px;
 }
 
 .bcp-custom-controls button svg {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     fill: #fff;
-    display: block;
+    pointer-events: none;
+}
+
+.bcp-volume-slider {
+    width: 80px;
+    margin-left: 8px;
+}
+
+.bcp-time-display {
+    color: #fff;
+    font-size: 14px;
+    margin-right: 15px;
 }
 
 /* --- Fullscreen State --- */
