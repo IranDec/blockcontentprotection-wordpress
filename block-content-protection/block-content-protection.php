@@ -18,6 +18,275 @@ if ( ! defined( 'WPINC' ) ) {
 
 define( 'BCP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+/**
+ * Handles generating and validating expiring links for media files.
+ */
+function bcp_handle_media_request() {
+    // Check if the request is for a secure media link
+    if ( ! isset( $_GET['bcp_media_token'] ) || ! isset( $_GET['bcp_media_src'] ) ) {
+        return;
+    }
+
+    // Block download managers
+    $options = get_option( 'bcp_options', [] );
+    if ( ! empty( $options['disable_media_download'] ) && isset( $_SERVER['HTTP_USER_AGENT'] ) ) {
+        $user_agent = strtolower( $_SERVER['HTTP_USER_AGENT'] );
+        $blocked_agents = [ 'idm', 'internet download manager', 'flashget' ];
+        foreach ( $blocked_agents as $agent ) {
+            if ( strpos( $user_agent, $agent ) !== false ) {
+                wp_die( 'Access to this media file is restricted.', 'Forbidden', [ 'response' => 403 ] );
+            }
+        }
+    }
+
+    $token = sanitize_text_field( $_GET['bcp_media_token'] );
+    $encoded_src = sanitize_text_field( $_GET['bcp_media_src'] );
+    $expires = isset( $_GET['bcp_expires'] ) ? intval( $_GET['bcp_expires'] ) : 0;
+
+    // --- Device Limit Check ---
+    if ( ! empty( $options['enable_device_limit'] ) ) {
+        if ( ! is_user_logged_in() ) {
+            wp_die( 'You must be logged in to view this content.', 'Unauthorized', [ 'response' => 401 ] );
+        }
+
+        $device_id = isset( $_GET['bcp_device_id'] ) ? sanitize_text_field( $_GET['bcp_device_id'] ) : '';
+        if ( empty( $device_id ) ) {
+            wp_die( 'Invalid device ID.', 'Bad Request', [ 'response' => 400 ] );
+        }
+
+        $user_id = get_current_user_id();
+        $active_devices = get_user_meta( $user_id, 'bcp_active_devices', true );
+        if ( ! is_array( $active_devices ) ) {
+            $active_devices = [];
+        }
+
+        $limit = ! empty( $options['device_limit_count'] ) ? intval( $options['device_limit_count'] ) : 2;
+
+        if ( ! in_array( $device_id, $active_devices, true ) ) {
+            if ( count( $active_devices ) >= $limit ) {
+                wp_die( 'You have reached your device limit. Please remove an existing device to add a new one.', 'Forbidden', [ 'response' => 403 ] );
+            } else {
+                $active_devices[] = $device_id;
+                update_user_meta( $user_id, 'bcp_active_devices', $active_devices );
+            }
+        }
+    }
+
+    // Validate the token
+    $ip_address = isset( $_GET['bcp_ip'] ) ? sanitize_text_field( $_GET['bcp_ip'] ) : '';
+    if ( ! bcp_validate_media_token( $encoded_src, $expires, $token, $ip_address ) ) {
+        wp_die( 'Invalid or expired media link.', 'Forbidden', [ 'response' => 403 ] );
+    }
+
+    $media_url = rawurldecode( $encoded_src );
+
+    // Serve the file
+    $upload_dir = wp_upload_dir();
+    if ( strpos( $media_url, $upload_dir['baseurl'] ) !== false ) {
+        // Local file
+        $file_path = ltrim( str_replace( $upload_dir['baseurl'], '', $media_url ), '/' );
+        $full_file_path = realpath( $upload_dir['basedir'] . '/' . $file_path );
+
+        if ( ! $full_file_path || strpos( $full_file_path, realpath( $upload_dir['basedir'] ) ) !== 0 ) {
+            wp_die( 'Invalid file path.', 'Bad Request', [ 'response' => 400 ] );
+        }
+
+        if ( file_exists( $full_file_path ) ) {
+            bcp_stream_media( $full_file_path );
+        }
+    }
+    // Note: Streaming/proxying external files with byte-range support is complex
+    // and has been removed for this implementation to focus on local files.
+
+    wp_die( 'File not found.', 'Not Found', [ 'response' => 404 ] );
+}
+add_action( 'init', 'bcp_handle_media_request' );
+
+/**
+ * Streams a local media file with support for byte-range requests.
+ */
+function bcp_stream_media( $file_path ) {
+    $file_size = filesize( $file_path );
+    $mime_type = wp_check_filetype( $file_path )['type'];
+
+    header( 'Content-Type: ' . $mime_type );
+    header( 'Accept-Ranges: bytes' );
+    header( 'Content-Disposition: inline; filename="' . basename( $file_path ) . '"' );
+
+    $range = isset( $_SERVER['HTTP_RANGE'] ) ? $_SERVER['HTTP_RANGE'] : null;
+
+    if ( $range ) {
+        list( $start, $end ) = explode( '=', $range );
+        if ( strpos( $start, 'bytes' ) !== false ) {
+            list( $start, $end ) = explode( '-', substr( $start, 6 ) );
+        }
+
+        $start = intval( $start );
+        $end = ( $end === '' ) ? ( $file_size - 1 ) : intval( $end );
+
+        header( 'HTTP/1.1 206 Partial Content' );
+        header( 'Content-Length: ' . ( $end - $start + 1 ) );
+        header( "Content-Range: bytes $start-$end/$file_size" );
+
+        $handle = fopen( $file_path, 'rb' );
+        fseek( $handle, $start );
+
+        $buffer = 1024 * 8;
+        while ( ! feof( $handle ) && ( $pos = ftell( $handle ) ) <= $end ) {
+            if ( $pos + $buffer > $end ) {
+                $buffer = $end - $pos + 1;
+            }
+            echo fread( $handle, $buffer );
+            flush();
+        }
+        fclose( $handle );
+    } else {
+        header( 'Content-Length: ' . $file_size );
+        readfile( $file_path );
+    }
+    exit;
+}
+
+/**
+ * Generates a secure token for a media link.
+ */
+function bcp_generate_media_token( $file_path, $expires, $ip_address = '' ) {
+    $options = get_option( 'bcp_options', [] );
+    $secret_key = defined( 'NONCE_KEY' ) ? NONCE_KEY : get_site_option( 'secret_key' );
+    $hash_data = $file_path . '|' . $expires . '|' . $secret_key;
+    if ( ! empty( $options['enable_ip_binding'] ) && ! empty( $ip_address ) ) {
+        $hash_data .= '|' . $ip_address;
+    }
+    return hash( 'sha256', $hash_data );
+}
+
+
+/**
+ * Validates a secure media token.
+ */
+function bcp_validate_media_token( $file_path, $expires, $token, $ip_address = '' ) {
+    $options = get_option( 'bcp_options', [] );
+    if ( time() > $expires ) {
+        return false; // Link has expired
+    }
+
+    $current_ip = bcp_get_user_ip();
+
+    // Check if the IP address matches, but only if the setting is enabled
+    if ( ! empty( $options['enable_ip_binding'] ) ) {
+        if ( $current_ip !== $ip_address ) {
+            return false;
+        }
+        // Regenerate the token with the IP for validation
+        $expected_token = bcp_generate_media_token( $file_path, $expires, $current_ip );
+    } else {
+        // Regenerate the token without the IP for validation
+        $expected_token = bcp_generate_media_token( $file_path, $expires );
+    }
+
+
+    return hash_equals( $expected_token, $token );
+}
+
+/**
+ * Generates a secure, expiring URL for a given media source.
+ */
+function bcp_get_media_url( $src ) {
+    $options = get_option( 'bcp_options', [] );
+    if ( empty( $src ) || empty( $options['enable_expiring_links'] ) ) {
+        return $src;
+    }
+
+    // Don't re-protect an already protected URL
+    if ( strpos( $src, 'bcp_media_token=' ) !== false ) {
+        return $src;
+    }
+
+    $duration = ! empty( $options['expiring_links_duration'] ) ? intval( $options['expiring_links_duration'] ) : 3600;
+    $expires = time() + $duration;
+    $encoded_src = rawurlencode( $src );
+
+    $args = [
+        'bcp_media_src' => $encoded_src,
+        'bcp_expires'   => $expires,
+    ];
+
+    $ip_address = '';
+    if ( ! empty( $options['enable_ip_binding'] ) ) {
+        $ip_address = bcp_get_user_ip();
+        $args['bcp_ip'] = $ip_address;
+    }
+    $token = bcp_generate_media_token( $encoded_src, $expires, $ip_address );
+    $args['bcp_media_token'] = $token;
+
+    if ( ! empty( $options['enable_device_limit'] ) ) {
+        // The device ID will be generated and added by the frontend JS.
+        // We add a placeholder here which the JS will replace.
+        $args['bcp_device_id'] = '{DEVICE_ID}';
+    }
+
+    return add_query_arg( $args, home_url( '/' ) );
+}
+
+/**
+ * Automatically protects media in post content by replacing their URLs.
+ */
+function bcp_protect_media_in_content( $content ) {
+    $options = get_option( 'bcp_options', [] );
+
+    // Only run if the automatic protection is enabled
+    if ( empty( $options['enable_expiring_links'] ) || empty( $options['enable_automatic_protection'] ) ) {
+        return $content;
+    }
+
+    // Regex to find <video> and <audio> tags and their src attributes
+    $pattern = '/<(video|audio)([^>]*)src=["\']([^"\']+)["\']([^>]*)>/i';
+
+    return preg_replace_callback( $pattern, function( $matches ) {
+        $tag = $matches[1]; // video or audio
+        $pre_src_attrs = $matches[2];
+        $original_src = $matches[3];
+        $post_src_attrs = $matches[4];
+
+        // Generate the secure URL
+        $secure_url = bcp_get_media_url( $original_src );
+
+        // Reconstruct the tag with the new URL
+        return "<{$tag}{$pre_src_attrs}src=\"" . esc_url( $secure_url ) . "\"{$post_src_attrs}>";
+    }, $content );
+}
+add_filter( 'the_content', 'bcp_protect_media_in_content', 99 ); // High priority
+
+/**
+ * Shortcode to embed protected media.
+ */
+function bcp_media_shortcode( $atts ) {
+    $atts = shortcode_atts( [ 'src' => '' ], $atts, 'bcp_media' );
+    $src = $atts['src'];
+
+    if ( empty( $src ) ) {
+        return '';
+    }
+
+    $secure_url = bcp_get_media_url( $src );
+    $filetype = wp_check_filetype( $src );
+    $tag_type = '';
+
+    if ( strpos( $filetype['type'], 'video' ) !== false ) {
+        $tag_type = 'video';
+    } elseif ( strpos( $filetype['type'], 'audio' ) !== false ) {
+        $tag_type = 'audio';
+    }
+
+    if ( $tag_type ) {
+        // If expiring links are disabled, bcp_get_media_url returns original src
+        return "<{$tag_type} controls src=\"" . esc_url( $secure_url ) . "\"></{$tag_type}>";
+    }
+
+    return '';
+}
+add_shortcode( 'bcp_media', 'bcp_media_shortcode' );
+
 function bcp_add_admin_menu() {
     add_menu_page(
         __( 'Content Protection', 'block-content-protection' ),
@@ -42,7 +311,7 @@ function bcp_register_settings() {
         'disable_copy'              => __( 'Disable Copy (Ctrl+C)', 'block-content-protection' ),
         'disable_text_selection'    => __( 'Disable Text Selection', 'block-content-protection' ),
         'disable_image_drag'        => __( 'Disable Image Dragging', 'block-content-protection' ),
-        'disable_video_download'    => __( 'Disable Video Download', 'block-content-protection' ),
+        'disable_media_download'    => __( 'Block Media Download (IDM, etc.)', 'block-content-protection' ),
         'disable_screenshot'        => __( 'Disable Screenshot Shortcuts', 'block-content-protection' ),
         'enhanced_protection'       => __( 'Enhanced Screen Protection', 'block-content-protection' ),
         'mobile_screenshot_block'   => __( 'Block Mobile Screenshots', 'block-content-protection' ),
@@ -50,6 +319,9 @@ function bcp_register_settings() {
     ];
     foreach ($protection_fields as $id => $label) {
         $desc = '';
+         if ($id === 'disable_media_download') {
+            $desc = __( 'Protects video and audio files. Uses advanced techniques like Blob URLs and User-Agent blocking to prevent downloads from managers like IDM.', 'block-content-protection' );
+        }
         if ($id === 'disable_screenshot') {
             $desc = __( 'Blocks PrintScreen and macOS screenshot shortcuts (Cmd+Shift+3/4).', 'block-content-protection' );
         }
@@ -81,8 +353,16 @@ function bcp_register_settings() {
     add_settings_field( 'enable_video_watermark', __( 'Enable Video Watermark', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'enable_video_watermark', 'description' => __( 'Enable this to show a dynamic watermark over videos.', 'block-content-protection' ) ] );
     // add_settings_field( 'enable_page_watermark', __( 'Enable Full Page Watermark', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'enable_page_watermark', 'description' => __( 'Enable this to show a dynamic watermark over the entire page.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_text', __( 'Watermark Text', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_text', 'description' => __( 'Enter text for the watermark. Use placeholders: {user_login}, {user_email}, {user_mobile}, {ip_address}, {date}.', 'block-content-protection' ) ] );
+
+    // Expiring Links Section
+    add_settings_section( 'bcp_expiring_links_section', __( 'Expiring Media Links', 'block-content-protection' ), null, 'block_content_protection' );
+    add_settings_field( 'enable_expiring_links', __( 'Enable Expiring Links', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'enable_expiring_links', 'description' => __( 'Enable to generate secure, time-sensitive links for media files.', 'block-content-protection' ) ] );
+    add_settings_field( 'enable_automatic_protection', __( 'Enable Automatic Protection', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'enable_automatic_protection', 'description' => __( 'Automatically protect all video and audio tags in your content. If disabled, you must use the [bcp_media] shortcode.', 'block-content-protection' ) ] );
+    add_settings_field( 'expiring_links_duration', __( 'Link Expiration Time (seconds)', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'expiring_links_duration', 'description' => __( 'Set how long the media links should be valid. Default: 3600 seconds (1 hour).', 'block-content-protection' ), 'min' => 60, 'step' => 60 ] );
+    add_settings_field( 'enable_ip_binding', __( 'Bind Secure Links to User IP', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_expiring_links_section', [ 'id' => 'enable_ip_binding', 'description' => __( 'For the highest security, bind the expiring link to the user\'s IP address. Prevents sharing links but may cause issues for users with dynamic IPs.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_opacity', __( 'Watermark Opacity', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_opacity', 'description' => __( 'Set the opacity from 0 (transparent) to 1 (opaque). Default: 0.5', 'block-content-protection' ), 'min' => 0, 'max' => 1, 'step' => '0.1' ] );
-    add_settings_field( 'watermark_position', __( 'Watermark Position', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_position', 'description' => __( 'Select the watermark position.', 'block-content-protection' ), 'options' => [ 'animated' => 'Animated', 'top_left' => 'Top Left', 'top_right' => 'Top Right', 'bottom_left' => 'Bottom Left', 'bottom_right' => 'Bottom Right', ] ] );
+    add_settings_field( 'watermark_animated', __( 'Enable Watermark Animation', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_animated', 'description' => __( 'Enable to make the watermark move across the video.', 'block-content-protection' ) ] );
+    add_settings_field( 'watermark_position', __( 'Watermark Position', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_position', 'description' => __( 'Select the watermark position (only applies if animation is disabled).', 'block-content-protection' ), 'options' => [ 'top_left' => 'Top Left', 'top_right' => 'Top Right', 'bottom_left' => 'Bottom Left', 'bottom_right' => 'Bottom Right', ] ] );
     add_settings_field( 'watermark_style', __( 'Watermark Style', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_style', 'description' => __( 'Select the watermark style.', 'block-content-protection' ), 'options' => [ 'text' => 'Simple Text', 'pattern' => 'Pattern' ] ] );
 
     // Device Limit Section
@@ -90,6 +370,12 @@ function bcp_register_settings() {
     add_settings_field( 'enable_device_limit', __( 'Enable Device Limit', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'enable_device_limit', 'description' => __( 'Enable to limit the number of devices per user.', 'block-content-protection' ) ] );
     add_settings_field( 'device_limit_number', __( 'Number of Devices Allowed', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'device_limit_number', 'description' => __( 'Set the maximum number of devices a user can log in with. Default: 3', 'block-content-protection' ), 'min' => 1, 'step' => 1 ] );
     add_settings_field( 'device_limit_message', __( 'Device Limit Reached Message', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'device_limit_message', 'description' => __( 'The message shown to the user when they have reached their device limit.', 'block-content-protection' ) ] );
+    add_settings_field( 'watermark_count', __( 'Watermark Count', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_count', 'description' => __( 'Number of watermarks to display (for pattern style). Default: 30', 'block-content-protection' ), 'min' => 1, 'max' => 100, 'step' => 1 ] );
+
+    // Device Limit Section
+    add_settings_section( 'bcp_device_limit_section', __( 'Device Limit Settings', 'block-content-protection' ), null, 'block_content_protection' );
+    add_settings_field( 'enable_device_limit', __( 'Enable Device Limit', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'enable_device_limit', 'description' => __( 'Limit the number of devices a user can use to access media.', 'block-content-protection' ) ] );
+    add_settings_field( 'device_limit_count', __( 'Device Limit Count', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'device_limit_count', 'description' => __( 'Set the maximum number of allowed devices per user. Default: 2', 'block-content-protection' ), 'min' => 1, 'step' => 1 ] );
 }
 add_action( 'admin_init', 'bcp_register_settings' );
 
@@ -163,10 +449,12 @@ function bcp_sanitize_options( $input ) {
     // Define all known checkbox fields.
     $checkboxes = [
         'disable_right_click', 'disable_devtools', 'disable_copy',
-        'disable_text_selection', 'disable_image_drag', 'disable_video_download',
+        'disable_text_selection', 'disable_image_drag', 'disable_media_download',
         'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block',
         'video_screen_record_block', 'enable_video_watermark', //'enable_page_watermark',
         'enable_custom_messages', 'enable_device_limit'
+        'enable_custom_messages', 'watermark_animated', 'enable_expiring_links',
+        'enable_automatic_protection', 'enable_device_limit', 'enable_ip_binding'
     ];
 
     // For each checkbox, if it was submitted (checked), set to 1. Otherwise (unchecked), set to 0.
@@ -206,6 +494,14 @@ function bcp_sanitize_options( $input ) {
     }
     if ( isset( $input['device_limit_message'] ) ) {
         $new_options['device_limit_message'] = sanitize_text_field( $input['device_limit_message'] );
+    if ( isset( $input['watermark_count'] ) ) {
+        $new_options['watermark_count'] = intval( $input['watermark_count'] );
+    }
+    if ( isset( $input['expiring_links_duration'] ) ) {
+        $new_options['expiring_links_duration'] = intval( $input['expiring_links_duration'] );
+    }
+    if ( isset( $input['device_limit_count'] ) ) {
+        $new_options['device_limit_count'] = intval( $input['device_limit_count'] );
     }
 
     return $new_options;
@@ -243,6 +539,16 @@ function bcp_options_page() {
                         <div class="bcp-card-body">
                             <table class="form-table">
                                 <?php do_settings_fields( 'block_content_protection', 'bcp_watermark_section' ); ?>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Expiring Links Settings Card -->
+                    <div class="bcp-card">
+                        <h2 class="bcp-card-header"><?php _e( 'Expiring Media Links', 'block-content-protection' ); ?></h2>
+                        <div class="bcp-card-body">
+                            <table class="form-table">
+                                <?php do_settings_fields( 'block_content_protection', 'bcp_expiring_links_section' ); ?>
                             </table>
                         </div>
                     </div>
@@ -408,8 +714,7 @@ add_action( 'wp_enqueue_scripts', 'bcp_enqueue_scripts' );
 
 function bcp_add_module_to_script( $tag, $handle, $src ) {
     if ( 'bcp-protect-module' === $handle ) {
-        // Since the module is self-executing, we just need to add type="module"
-        $tag = '<script type="module" src="' . esc_url( $src ) . '" id="' . esc_attr( $handle ) . '-js"></script>';
+        $tag = '<script type="module" src="' . esc_url( $src ) . '" id="' . esc_attr( $handle ) . '-js" defer></script>';
     }
     return $tag;
 }
@@ -655,7 +960,7 @@ function bcp_activation() {
         'disable_copy'              => 1,
         'disable_text_selection'    => 1,
         'disable_image_drag'        => 1,
-        'disable_video_download'    => 1,
+        'disable_media_download'    => 1,
         'disable_screenshot'        => 1,
         'enhanced_protection'       => 0,
         'mobile_screenshot_block'   => 1,
@@ -667,13 +972,21 @@ function bcp_activation() {
         'enable_custom_messages'    => 0,
         'watermark_text'            => '',
         'enable_video_watermark'    => 0,
+        'enable_expiring_links'     => 0,
+        'enable_automatic_protection' => 1, // Enabled by default for better out-of-the-box protection
+        'expiring_links_duration'   => 3600,
         //'enable_page_watermark'     => 0,
         'watermark_opacity'         => 0.5,
-        'watermark_position'        => 'animated',
+        'watermark_animated'        => 1,
+        'watermark_position'        => 'top_left',
         'watermark_style'           => 'text',
         'enable_device_limit'       => 0,
         'device_limit_number'       => 3,
         'device_limit_message'      => 'You have reached the maximum number of allowed devices.',
+        'watermark_count'           => 30,
+        'enable_device_limit'       => 0,
+        'device_limit_count'        => 2,
+        'enable_ip_binding'         => 1, // Enabled by default
     ];
     if ( false === get_option( 'bcp_options' ) ) {
         update_option( 'bcp_options', $defaults );
