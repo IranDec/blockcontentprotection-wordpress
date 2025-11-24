@@ -3,7 +3,7 @@
  * Plugin Name:       Block Content Protection
  * Description:       A comprehensive plugin to protect website content. Blocks screenshots, screen recording, right-click, developer tools, and more.
  * Plugin URI:        https://adschi.com/
- * Version:           1.6.6
+ * Version:           1.6.7
  * Author:            Mohammad Babaei
  * Author URI:        https://adschi.com/
  * License:           GPL-2.0+
@@ -84,6 +84,12 @@ function bcp_register_settings() {
     add_settings_field( 'watermark_opacity', __( 'Watermark Opacity', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_opacity', 'description' => __( 'Set the opacity from 0 (transparent) to 1 (opaque). Default: 0.5', 'block-content-protection' ), 'min' => 0, 'max' => 1, 'step' => '0.1' ] );
     add_settings_field( 'watermark_position', __( 'Watermark Position', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_position', 'description' => __( 'Select the watermark position.', 'block-content-protection' ), 'options' => [ 'animated' => 'Animated', 'top_left' => 'Top Left', 'top_right' => 'Top Right', 'bottom_left' => 'Bottom Left', 'bottom_right' => 'Bottom Right', ] ] );
     add_settings_field( 'watermark_style', __( 'Watermark Style', 'block-content-protection' ), 'bcp_render_select_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_style', 'description' => __( 'Select the watermark style.', 'block-content-protection' ), 'options' => [ 'text' => 'Simple Text', 'pattern' => 'Pattern' ] ] );
+
+    // Device Limit Section
+    add_settings_section( 'bcp_device_limit_section', __( 'Device Limit Settings', 'block-content-protection' ), null, 'block_content_protection' );
+    add_settings_field( 'enable_device_limit', __( 'Enable Device Limit', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'enable_device_limit', 'description' => __( 'Enable to limit the number of devices per user.', 'block-content-protection' ) ] );
+    add_settings_field( 'device_limit_number', __( 'Number of Devices Allowed', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'device_limit_number', 'description' => __( 'Set the maximum number of devices a user can log in with. Default: 3', 'block-content-protection' ), 'min' => 1, 'step' => 1 ] );
+    add_settings_field( 'device_limit_message', __( 'Device Limit Reached Message', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'device_limit_message', 'description' => __( 'The message shown to the user when they have reached their device limit.', 'block-content-protection' ) ] );
 }
 add_action( 'admin_init', 'bcp_register_settings' );
 
@@ -160,7 +166,7 @@ function bcp_sanitize_options( $input ) {
         'disable_text_selection', 'disable_image_drag', 'disable_video_download',
         'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block',
         'video_screen_record_block', 'enable_video_watermark', //'enable_page_watermark',
-        'enable_custom_messages'
+        'enable_custom_messages', 'enable_device_limit'
     ];
 
     // For each checkbox, if it was submitted (checked), set to 1. Otherwise (unchecked), set to 0.
@@ -194,6 +200,12 @@ function bcp_sanitize_options( $input ) {
     }
     if ( isset( $input['watermark_style'] ) ) {
         $new_options['watermark_style'] = sanitize_key( $input['watermark_style'] );
+    }
+    if ( isset( $input['device_limit_number'] ) ) {
+        $new_options['device_limit_number'] = intval( $input['device_limit_number'] );
+    }
+    if ( isset( $input['device_limit_message'] ) ) {
+        $new_options['device_limit_message'] = sanitize_text_field( $input['device_limit_message'] );
     }
 
     return $new_options;
@@ -231,6 +243,16 @@ function bcp_options_page() {
                         <div class="bcp-card-body">
                             <table class="form-table">
                                 <?php do_settings_fields( 'block_content_protection', 'bcp_watermark_section' ); ?>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Device Limit Settings Card -->
+                    <div class="bcp-card">
+                        <h2 class="bcp-card-header"><?php _e( 'Device Limit Settings', 'block-content-protection' ); ?></h2>
+                        <div class="bcp-card-body">
+                            <table class="form-table">
+                                <?php do_settings_fields( 'block_content_protection', 'bcp_device_limit_section' ); ?>
                             </table>
                         </div>
                     </div>
@@ -393,6 +415,214 @@ function bcp_add_module_to_script( $tag, $handle, $src ) {
 }
 add_filter( 'script_loader_tag', 'bcp_add_module_to_script', 10, 3 );
 
+/**
+ * Ensures a device ID cookie is set for the visitor.
+ * This function will be hooked into 'init'.
+ */
+function bcp_manage_device_id_cookie() {
+    if ( ! isset( $_COOKIE['bcp_device_id'] ) || ! wp_is_uuid( $_COOKIE['bcp_device_id'] ) ) {
+        $uuid = wp_generate_uuid4();
+        $expire = isset($_SERVER['REQUEST_TIME']) ? $_SERVER['REQUEST_TIME'] + ( 10 * YEAR_IN_SECONDS ) : time() + ( 10 * YEAR_IN_SECONDS );
+        setcookie( 'bcp_device_id', $uuid, $expire, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+        $_COOKIE['bcp_device_id'] = $uuid;
+    }
+}
+add_action( 'init', 'bcp_manage_device_id_cookie' );
+
+/**
+ * Retrieves the unique device ID from the cookie.
+ *
+ * @return string|null The device ID or null if not set.
+ */
+function bcp_get_device_id() {
+    if ( isset( $_COOKIE['bcp_device_id'] ) ) {
+        return sanitize_text_field( $_COOKIE['bcp_device_id'] );
+    }
+    return null;
+}
+
+/**
+ * Tracks the user's device upon login.
+ *
+ * @param string  $user_login The user's login name.
+ * @param WP_User $user       The logged-in user object.
+ */
+function bcp_track_user_device( $user_login, $user ) {
+    $options = get_option( 'bcp_options', [] );
+    if ( empty( $options['enable_device_limit'] ) ) {
+        return;
+    }
+
+    $user_id = $user->ID;
+    $device_id = bcp_get_device_id();
+
+    if ( ! $device_id ) {
+        return;
+    }
+
+    $active_devices = get_user_meta( $user_id, 'bcp_active_devices', true );
+    if ( ! is_array( $active_devices ) ) {
+        $active_devices = [];
+    }
+
+    if ( ! in_array( $device_id, $active_devices, true ) ) {
+        $active_devices[] = $device_id;
+        update_user_meta( $user_id, 'bcp_active_devices', $active_devices );
+    }
+}
+add_action( 'wp_login', 'bcp_track_user_device', 10, 2 );
+
+/**
+ * Removes the user's device upon logout.
+ *
+ * @param int $user_id The ID of the user logging out.
+ */
+function bcp_untrack_user_device( $user_id ) {
+    $options = get_option( 'bcp_options', [] );
+    if ( empty( $options['enable_device_limit'] ) ) {
+        return;
+    }
+
+    if ( ! $user_id ) {
+        return;
+    }
+
+    $device_id = bcp_get_device_id();
+    if ( ! $device_id ) {
+        return;
+    }
+
+    $active_devices = get_user_meta( $user_id, 'bcp_active_devices', true );
+
+    if ( is_array( $active_devices ) ) {
+        $new_devices = array_values( array_diff( $active_devices, [ $device_id ] ) );
+        update_user_meta( $user_id, 'bcp_active_devices', $new_devices );
+    }
+}
+add_action( 'wp_logout', 'bcp_untrack_user_device', 10, 1 );
+
+/**
+ * Validates the user's device count before allowing login.
+ *
+ * @param WP_User|WP_Error|null $user     The user object or error object.
+ * @param string                $username The username.
+ * @param string                $password The user's password.
+ * @return WP_User|WP_Error The user object if login is allowed, otherwise a WP_Error.
+ */
+function bcp_validate_device_limit( $user, $username, $password ) {
+    if ( is_wp_error( $user ) || ! $user ) {
+        return $user;
+    }
+
+    $options = get_option( 'bcp_options', [] );
+    if ( empty( $options['enable_device_limit'] ) ) {
+        return $user;
+    }
+
+    $user_id = $user->ID;
+    $device_id = bcp_get_device_id();
+
+    if ( ! $device_id ) {
+        // If there's no device ID, we can't enforce the limit, so we allow login.
+        return $user;
+    }
+
+    $active_devices = get_user_meta( $user_id, 'bcp_active_devices', true );
+    if ( ! is_array( $active_devices ) ) {
+        $active_devices = [];
+    }
+
+    $limit = ! empty( $options['device_limit_number'] ) ? intval( $options['device_limit_number'] ) : 3;
+
+    if ( ! in_array( $device_id, $active_devices, true ) && count( $active_devices ) >= $limit ) {
+        $message = ! empty( $options['device_limit_message'] ) ? $options['device_limit_message'] : __( 'You have reached the maximum number of allowed devices.', 'block-content-protection' );
+        return new WP_Error( 'device_limit_exceeded', $message );
+    }
+
+    return $user;
+}
+add_filter( 'authenticate', 'bcp_validate_device_limit', 30, 3 );
+
+/**
+ * Adds the device management section to the user profile page.
+ *
+ * @param WP_User $user The current user object.
+ */
+function bcp_show_device_management_section( $user ) {
+    $options = get_option( 'bcp_options', [] );
+    if ( empty( $options['enable_device_limit'] ) ) {
+        return;
+    }
+
+    $active_devices = get_user_meta( $user->ID, 'bcp_active_devices', true );
+    if ( ! is_array( $active_devices ) ) {
+        $active_devices = [];
+    }
+
+    $current_device_id = bcp_get_device_id();
+    ?>
+    <div class="bcp-device-management">
+        <h3><?php _e( 'Manage Active Devices', 'block-content-protection' ); ?></h3>
+        <p><?php _e( 'Here you can see the list of devices you are currently logged in with. You can remove devices you no longer use.', 'block-content-protection' ); ?></p>
+        <table class="form-table">
+            <tr>
+                <th><label><?php _e( 'Your Devices', 'block-content-protection' ); ?></label></th>
+                <td>
+                    <?php if ( ! empty( $active_devices ) ) : ?>
+                        <ul class="bcp-device-list">
+                            <?php foreach ( $active_devices as $device_id ) : ?>
+                                <li>
+                                    <span class="device-id"><?php echo esc_html( $device_id ); ?></span>
+                                    <?php if ( $device_id === $current_device_id ) : ?>
+                                        <span class="current-device-label">(<?php _e( 'Current Device', 'block-content-protection' ); ?>)</span>
+                                    <?php else : ?>
+                                        <button type="submit" name="bcp_remove_device" value="<?php echo esc_attr( $device_id ); ?>" class="button button-secondary"><?php _e( 'Remove', 'block-content-protection' ); ?></button>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else : ?>
+                        <p><?php _e( 'No active devices found.', 'block-content-protection' ); ?></p>
+                    <?php endif; ?>
+                </td>
+            </tr>
+        </table>
+        <?php wp_nonce_field( 'bcp_remove_device_action', 'bcp_remove_device_nonce' ); ?>
+    </div>
+    <?php
+}
+add_action( 'show_user_profile', 'bcp_show_device_management_section' );
+add_action( 'edit_user_profile', 'bcp_show_device_management_section' );
+
+/**
+ * Handles the removal of a device from the user's active devices list.
+ *
+ * @param int $user_id The ID of the user being updated.
+ */
+function bcp_handle_remove_device( $user_id ) {
+    if ( ! current_user_can( 'edit_user', $user_id ) ) {
+        return;
+    }
+
+    if ( isset( $_POST['bcp_remove_device'] ) ) {
+        check_admin_referer( 'bcp_remove_device_action', 'bcp_remove_device_nonce' );
+
+        $device_to_remove = sanitize_text_field( $_POST['bcp_remove_device'] );
+        $active_devices = get_user_meta( $user_id, 'bcp_active_devices', true );
+
+        if ( is_array( $active_devices ) ) {
+            $new_devices = array_values( array_diff( $active_devices, [ $device_to_remove ] ) );
+            update_user_meta( $user_id, 'bcp_active_devices', $new_devices );
+        }
+
+        // Redirect to avoid form resubmission
+        wp_redirect( get_edit_user_link( $user_id ) );
+        exit;
+    }
+}
+add_action( 'personal_options_update', 'bcp_handle_remove_device' );
+add_action( 'edit_user_profile_update', 'bcp_handle_remove_device' );
+
 function bcp_enqueue_admin_scripts( $hook ) {
     // Only load on our plugin's settings page
     if ( 'toplevel_page_block_content_protection' !== $hook ) {
@@ -441,6 +671,9 @@ function bcp_activation() {
         'watermark_opacity'         => 0.5,
         'watermark_position'        => 'animated',
         'watermark_style'           => 'text',
+        'enable_device_limit'       => 0,
+        'device_limit_number'       => 3,
+        'device_limit_message'      => 'You have reached the maximum number of allowed devices.',
     ];
     if ( false === get_option( 'bcp_options' ) ) {
         update_option( 'bcp_options', $defaults );
