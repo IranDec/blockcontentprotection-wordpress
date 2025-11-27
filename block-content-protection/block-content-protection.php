@@ -875,70 +875,8 @@ function bcp_untrack_user_device( $user_id ) {
 }
 add_action( 'wp_logout', 'bcp_untrack_user_device', 10, 1 );
 
-/**
- * Validates the user's device count before allowing login.
- *
- * @param WP_User|WP_Error|null $user     The user object or error object.
- * @param string                $username The username.
- * @param string                $password The user's password.
- * @return WP_User|WP_Error The user object if login is allowed, otherwise a WP_Error.
- */
-function bcp_validate_device_limit( $user, $username, $password ) {
-    if ( is_wp_error( $user ) || ! $user ) {
-        return $user;
-    }
-
-    $options = get_option( 'bcp_options', [] );
-    if ( empty( $options['enable_device_limit'] ) ) {
-        return $user;
-    }
-
-    $user_id = $user->ID;
-    $device_id = bcp_get_device_id();
-
-    $active_devices = get_user_meta( $user_id, 'bcp_active_devices', true );
-    if ( ! is_array( $active_devices ) ) {
-        $active_devices = [];
-    }
-
-    $device_found = false;
-    foreach( $active_devices as $device ) {
-        if ( isset( $device['id'] ) && $device['id'] === $device_id ) {
-            $device_found = true;
-            break;
-        }
-    }
-
-    $limit = ! empty( $options['device_limit_number'] ) ? intval( $options['device_limit_number'] ) : 3;
-
-    if ( ! $device_found && count( $active_devices ) >= $limit ) {
-        // Device limit exceeded, prepare for redirection
-        $new_device_info = [
-            'id'         => $device_id,
-            'last_login' => time(),
-            'ip_address' => bcp_get_user_ip(),
-            'user_agent' => isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '',
-        ];
-
-        // Store pending login info for 5 minutes
-        set_transient( 'bcp_pending_login_' . $user_id, $new_device_info, 5 * MINUTE_IN_SECONDS );
-
-        // Redirect to the management page
-        $redirect_url = add_query_arg( [
-            'bcp-manage-devices' => '1',
-            'user_id' => $user_id,
-            'nonce' => wp_create_nonce('bcp-device-management-' . $user_id)
-        ], home_url('/') );
-
-        wp_redirect( $redirect_url );
-        // Add a fallback for browsers that don't follow redirects
-        echo '<p>You have too many devices logged in. <a href="' . esc_url($redirect_url) . '">Please click here to manage your devices.</a></p>';
-        exit;
-    }
-
-    return $user;
-}
-add_filter( 'authenticate', 'bcp_validate_device_limit', 30, 3 );
+// bcp_validate_device_limit removed to prevent login blocking.
+// Logic is now handled by auto-rotation in bcp_track_user_device.
 
 /**
  * Handles the device management page for when a user exceeds their device limit.
@@ -1200,8 +1138,15 @@ function bcp_verify_current_device_session() {
 
     $active_devices = get_user_meta( $user_id, 'bcp_active_devices', true );
     if ( ! is_array( $active_devices ) ) {
-        // If there's no device list, something is wrong. For safety, log out.
-        wp_logout();
+        $active_devices = [];
+    }
+
+    // If the device list is empty, it means this is the first run since feature activation
+    // or the database was cleared. To prevent admin lockout, we automatically add the
+    // current device to the allowed list (subject to limit via rotation logic).
+    if ( empty( $active_devices ) ) {
+        $user = get_user_by( 'id', $user_id );
+        bcp_track_user_device( $user->user_login, $user );
         return;
     }
 
