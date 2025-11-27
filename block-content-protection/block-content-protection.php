@@ -3,7 +3,7 @@
  * Plugin Name:       Block Content Protection
  * Description:       A comprehensive plugin to protect website content. Blocks screenshots, screen recording, right-click, developer tools, and more.
  * Plugin URI:        https://adschi.com/
- * Version:           1.7.0
+ * Version:           1.7.1
  * Author:            Mohammad Babaei
  * Author URI:        https://adschi.com/
  * License:           GPL-2.0+
@@ -367,6 +367,7 @@ function bcp_register_settings() {
     // Device Limit Section
     add_settings_section( 'bcp_device_limit_section', __( 'Device Limit Settings', 'block-content-protection' ), null, 'block_content_protection' );
     add_settings_field( 'enable_device_limit', __( 'Enable Device Limit', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'enable_device_limit', 'description' => __( 'Enable to limit the number of devices per user.', 'block-content-protection' ) ] );
+    add_settings_field( 'enable_single_session', __( 'Limit Active Sessions', 'block-content-protection' ), 'bcp_render_checkbox_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'enable_single_session', 'description' => __( 'Only allow one active session at a time (logs out other sessions upon login).', 'block-content-protection' ) ] );
     add_settings_field( 'device_limit_number', __( 'Number of Devices Allowed', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'device_limit_number', 'description' => __( 'Set the maximum number of devices a user can log in with. Default: 3', 'block-content-protection' ), 'min' => 1, 'step' => 1 ] );
     add_settings_field( 'device_limit_message', __( 'Device Limit Reached Message', 'block-content-protection' ), 'bcp_render_textfield_field', 'block_content_protection', 'bcp_device_limit_section', [ 'id' => 'device_limit_message', 'description' => __( 'The message shown to the user when they have reached their device limit.', 'block-content-protection' ) ] );
     add_settings_field( 'watermark_count', __( 'Watermark Count', 'block-content-protection' ), 'bcp_render_number_field', 'block_content_protection', 'bcp_watermark_section', [ 'id' => 'watermark_count', 'description' => __( 'Number of watermarks to display (for pattern style). Default: 30', 'block-content-protection' ), 'min' => 1, 'max' => 100, 'step' => 1 ] );
@@ -448,7 +449,8 @@ function bcp_sanitize_options( $input ) {
         'disable_screenshot', 'enhanced_protection', 'mobile_screenshot_block',
         'video_screen_record_block', 'enable_video_watermark',
         'enable_custom_messages', 'watermark_animated', 'enable_expiring_links',
-        'enable_automatic_protection', 'enable_device_limit', 'enable_ip_binding'
+        'enable_automatic_protection', 'enable_device_limit', 'enable_ip_binding',
+        'enable_single_session'
     ];
 
     // For each checkbox, if it was submitted (checked), set to 1. Otherwise (unchecked), set to 0.
@@ -688,7 +690,7 @@ function bcp_enqueue_scripts() {
         }
 
         // Enqueue the new module script
-        wp_enqueue_script( 'bcp-protect-module', BCP_PLUGIN_URL . 'js/protect.module.js', [], '1.7.0', true );
+        wp_enqueue_script( 'bcp-protect-module', BCP_PLUGIN_URL . 'js/protect.module.js', [], '1.7.1', true );
 
         // Create a data bridge for the module
         add_action('wp_footer', function() use ($options) {
@@ -698,7 +700,7 @@ function bcp_enqueue_scripts() {
 
         // Enqueue styles if needed
         if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) ) {
-            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.7.0' );
+            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.7.1' );
         }
     }
 }
@@ -733,14 +735,35 @@ function bcp_get_device_id() {
  *
  * @param string  $user_login The user's login name.
  * @param WP_User $user       The logged-in user object.
+ * @param string  $token      Optional. The session token if available (e.g. from cookie hook).
  */
-function bcp_track_user_device( $user_login, $user ) {
+function bcp_track_user_device( $user_login, $user = null, $token = '' ) {
+    static $tracked_requests = [];
+
+    // Ensure we have a user object
+    if ( ! $user && $user_login instanceof WP_User ) {
+        $user = $user_login;
+    } elseif ( ! $user ) {
+        $user = get_user_by( 'login', $user_login );
+    }
+
+    if ( ! $user ) {
+        return;
+    }
+
+    $user_id = $user->ID;
+
+    // Prevent double tracking in the same request
+    if ( isset( $tracked_requests[$user_id] ) ) {
+        return;
+    }
+    $tracked_requests[$user_id] = true;
+
     $options = get_option( 'bcp_options', [] );
     if ( empty( $options['enable_device_limit'] ) ) {
         return;
     }
 
-    $user_id = $user->ID;
     $device_id = bcp_get_device_id();
 
     if ( ! $device_id ) {
@@ -762,7 +785,19 @@ function bcp_track_user_device( $user_login, $user ) {
         }
     }
 
+    // Limit enforcement logic
+    $limit = ! empty( $options['device_limit_number'] ) ? intval( $options['device_limit_number'] ) : 3;
+
     if ( ! $device_exists ) {
+        // If we are about to add a new device, check the limit
+        if ( count( $active_devices ) >= $limit ) {
+            // Auto-rotate: Remove the oldest device to make room
+            usort($active_devices, function($a, $b) {
+                return ($a['last_login'] ?? 0) <=> ($b['last_login'] ?? 0);
+            });
+            array_shift($active_devices); // Remove first (oldest)
+        }
+
         $active_devices[] = [
             'id'         => $device_id,
             'last_login' => time(),
@@ -771,8 +806,40 @@ function bcp_track_user_device( $user_login, $user ) {
         ];
     }
     update_user_meta( $user_id, 'bcp_active_devices', $active_devices );
+
+    // Single Session Enforcement
+    if ( ! empty( $options['enable_single_session'] ) ) {
+        if ( ! empty( $token ) ) {
+            // If we have the token (from set_auth_cookie), we can destroy others directly
+            $manager = WP_Session_Tokens::get_instance( $user_id );
+            $manager->destroy_others( $token );
+        } else {
+            // Fallback for standard login where cookie might be set later
+            // or if we are in a context where wp_get_session_token() works
+            $current_token = wp_get_session_token();
+            if ( $current_token ) {
+                $manager = WP_Session_Tokens::get_instance( $user_id );
+                $manager->destroy_others( $current_token );
+            }
+        }
+    }
 }
 add_action( 'wp_login', 'bcp_track_user_device', 10, 2 );
+
+/**
+ * Tracks the user's device when auth cookie is set (e.g., via Digits).
+ */
+function bcp_track_user_device_cookie( $auth_cookie, $expire, $expiration, $user_id, $scheme ) {
+    $user = get_user_by( 'id', $user_id );
+    if ( $user ) {
+        // Extract the token from the cookie value
+        $cookie_elements = wp_parse_auth_cookie( $auth_cookie, $scheme );
+        $token = isset( $cookie_elements['token'] ) ? $cookie_elements['token'] : '';
+
+        bcp_track_user_device( $user->user_login, $user, $token );
+    }
+}
+add_action( 'set_auth_cookie', 'bcp_track_user_device_cookie', 10, 5 );
 
 /**
  * Removes the user's device upon logout.
@@ -1179,7 +1246,7 @@ function bcp_enqueue_admin_scripts( $hook ) {
         'bcp-admin-styles',
         BCP_PLUGIN_URL . 'admin/css/admin-styles.css',
         [],
-        '1.7.0'
+        '1.7.1'
     );
 
     // Enqueue Admin JS
@@ -1187,7 +1254,7 @@ function bcp_enqueue_admin_scripts( $hook ) {
         'bcp-admin-scripts',
         BCP_PLUGIN_URL . 'admin/js/admin-scripts.js',
         [],
-        '1.7.0',
+        '1.7.1',
         true
     );
 }
@@ -1240,6 +1307,7 @@ function bcp_activation() {
         'watermark_position'        => 'top_left',
         'watermark_style'           => 'text',
         'enable_device_limit'       => 0,
+        'enable_single_session'     => 0,
         'device_limit_number'       => 3,
         'device_limit_message'      => 'You have reached the maximum number of allowed devices.',
         'watermark_count'           => 30,
