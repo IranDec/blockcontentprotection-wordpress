@@ -2,16 +2,6 @@
 
 All notable changes to Block Content Protection will be documented in this file.
 
-## [1.7.0] - 2025-11-26
-
-### Added
-- **Device Limitation**: Implemented a robust device limitation system to prevent account sharing.
-  - Users are restricted to a configurable number of concurrent devices (default: 3).
-  - When the limit is reached, users are prompted to either automatically log out the oldest device or manually select a device to remove.
-  - A new device management section has been added to the user's profile page, allowing them to view and remove active devices.
-- **Immediate Session Termination**: Implemented a new security measure that immediately terminates a user's session if their device is removed from the active devices list.
-  - This check is performed on every page load to ensure that users cannot continue to access content after their device has been removed.
-
 ## [1.6.6] - 2025-10-27
 
 ### Fixed
@@ -91,24 +81,24 @@ All notable changes to Block Content Protection will be documented in this file.
   - Three-finger gesture detection
   - Automatic blur on focus loss
   - Visibility change protection
-  
+
 - **Video Screen Recording Protection**: New advanced feature to protect videos from screen recording
   - Detects `getDisplayMedia` API usage
   - Automatically turns videos black when recording is detected
   - Continuous monitoring during playback
   - Multiple protection layers
-  
+
 - **Enhanced Security Features**:
   - DevTools opening detection with automatic page blocking
   - Iframe embedding prevention
   - Print blocking via CSS
   - Automatic clipboard clearing after screenshot attempts
-  
+
 - **New Settings**:
   - Mobile Screenshot Block toggle
   - Video Screen Recording Block toggle
   - Custom alert message for recording detection
-  
+
 - **CSS Enhancements**:
   - Mobile-specific protection styles
   - Video blackout filters
