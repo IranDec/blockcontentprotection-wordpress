@@ -1,0 +1,162 @@
+/* Enhanced screen protection */
+.bcp-enhanced-protection {
+    -webkit-filter: brightness(101%);
+}
+
+/* --- Wrapper and Custom Controls --- */
+.bcp-watermark-wrapper {
+    position: relative;
+    display: inline-block;
+    overflow: hidden;
+    /* Ensure the background is black when going fullscreen */
+    background-color: #000;
+}
+
+/* Re-enable pointer events on the video itself */
+.bcp-watermark-wrapper > video {
+    pointer-events: auto;
+}
+
+/* Custom fullscreen button */
+.bcp-custom-fullscreen-btn {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 8px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Show the button on hover */
+.bcp-watermark-wrapper:hover .bcp-custom-fullscreen-btn {
+    opacity: 1;
+}
+
+.bcp-custom-fullscreen-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: #fff;
+    display: block;
+}
+
+/* --- Fullscreen State --- */
+.bcp-watermark-wrapper:fullscreen {
+    width: 100%;
+    height: 100%;
+}
+
+.bcp-watermark-wrapper:fullscreen > video {
+    width: 100%;
+    height: 100%;
+}
+
+/* Force-hide the native fullscreen button */
+video::-webkit-media-controls-fullscreen-button {
+    display: none !important;
+}
+video::-moz-fullscreen-button {
+    display: none !important;
+}
+video::-ms-fullscreen-button {
+    display: none !important;
+}
+video::-webkit-media-controls-panel [role="button"][aria-label~="fullscreen" i] {
+    display: none !important;
+}
+
+
+/* --- Watermark Base Styles --- */
+.bcp-watermark, .bcp-watermark-pattern-span {
+    position: absolute;
+    color: rgba(255, 255, 255, 0.5);
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 9999;
+    white-space: nowrap;
+    text-align: center;
+}
+
+/* --- Watermark Positions --- */
+.bcp-wm-position-top-left { top: 10px; left: 10px; }
+.bcp-wm-position-top-right { top: 10px; right: 10px; }
+.bcp-wm-position-bottom-left { bottom: 10px; left: 10px; }
+.bcp-wm-position-bottom-right { bottom: 10px; right: 10px; }
+
+/* --- Animated Watermark --- */
+.bcp-wm-style-text.bcp-wm-position-animated {
+    top: 10px;
+    left: 10px;
+    animation: bcp-watermark-move 15s infinite alternate ease-in-out;
+}
+
+@keyframes bcp-watermark-move {
+    0% { top: 2%; left: 2%; }
+    25% { top: 2%; left: calc(100% - 150px); } /* Adjust for text width */
+    50% { top: calc(100% - 40px); left: calc(100% - 150px); }
+    75% { top: calc(100% - 40px); left: 2%; }
+    100% { top: 2%; left: 2%; }
+}
+
+/* --- Pattern Watermark --- */
+.bcp-wm-style-pattern {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    align-items: center;
+    pointer-events: none;
+    z-index: 9998;
+    animation: bcp-pattern-scroll 30s linear infinite;
+}
+
+.bcp-watermark-pattern-span {
+    position: relative;
+    margin: 20px 40px;
+    transform: rotate(-15deg);
+}
+
+@keyframes bcp-pattern-scroll {
+    from { transform: translateX(0) translateY(0); }
+    to { transform: translateX(-50px) translateY(-50px); }
+}
+
+/* --- Screen Recording/Screenshot Protection --- */
+.bcp-recording-detected > video {
+    filter: brightness(0) !important;
+}
+
+@media (display-capture: monitor) {
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: black;
+        z-index: 999999;
+    }
+}
+
+body.bcp-screenshot-detected::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: black;
+    z-index: 9999999;
+}
