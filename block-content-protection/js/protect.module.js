@@ -35,8 +35,6 @@ const protectVideo = (video) => {
         applyWatermark(wrapper);
     }
 
-    // Add the custom fullscreen button
-    addCustomFullscreenButton(wrapper);
 
     // Secure the video source if download protection is enabled
     if (bcp_settings.disable_video_download) {
@@ -91,24 +89,6 @@ const applyWatermark = (wrapper) => {
     wrapper.appendChild(element);
 };
 
-const addCustomFullscreenButton = (wrapper) => {
-    const button = document.createElement('button');
-    button.className = 'bcp-custom-fullscreen-btn';
-    button.setAttribute('aria-label', 'Enter Fullscreen');
-    button.innerHTML = '<svg viewbox="0 0 18 18"><path d="M4.5 11H3v4h4v-1.5H4.5V11zM3 7h1.5V4.5H7V3H3v4zm10.5 6.5H11V15h4v-4h-1.5v2.5zM11 3v1.5h2.5V7H15V3h-4z"></path></svg>';
-    wrapper.appendChild(button);
-
-    // Handle cross-browser fullscreen requests
-    button.addEventListener('click', () => {
-        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-            if (wrapper.requestFullscreen) wrapper.requestFullscreen();
-            else if (wrapper.webkitRequestFullscreen) wrapper.webkitRequestFullscreen();
-        } else {
-            if (document.exitFullscreen) document.exitFullscreen();
-            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-        }
-    });
-};
 
 // --- General Protection Event Handlers ---
 const preventDefault = e => e.preventDefault();
