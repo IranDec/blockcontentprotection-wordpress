@@ -17,32 +17,6 @@
     pointer-events: auto;
 }
 
-/* Custom fullscreen button */
-.bcp-custom-fullscreen-btn {
-    position: absolute;
-    bottom: 10px;
-    right: 10px;
-    z-index: 10000;
-    background: rgba(0, 0, 0, 0.5);
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    padding: 8px;
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-}
-
-/* Show the button on hover */
-.bcp-watermark-wrapper:hover .bcp-custom-fullscreen-btn {
-    opacity: 1;
-}
-
-.bcp-custom-fullscreen-btn svg {
-    width: 20px;
-    height: 20px;
-    fill: #fff;
-    display: block;
-}
 
 /* --- Fullscreen State --- */
 .bcp-watermark-wrapper:fullscreen {
