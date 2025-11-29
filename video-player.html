@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academy-Tech Custom Video Player</title>
+
+    <!-- Plyr.io CSS -->
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 960px;
+            width: 100%;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        /* Dark Theme for Plyr */
+        :root {
+            --plyr-color-main: #00a8ff;
+            --plyr-video-background: #000000;
+            --plyr-video-control-background-hover: rgba(20, 20, 30, 0.85);
+            --plyr-video-control-color: #ffffff;
+            --plyr-video-control-color-hover: #ffffff;
+            --plyr-video-progress-buffered-background: rgba(255, 255, 255, 0.25);
+            --plyr-tooltip-background: rgba(20, 20, 30, 0.8);
+            --plyr-tooltip-color: #ffffff;
+            --plyr-menu-background: rgba(20, 20, 30, 0.9);
+            --plyr-menu-color: #ffffff;
+            --plyr-menu-back-border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .plyr__menu__button--radio:hover, .plyr__menu__button--radio:focus {
+            background: var(--plyr-color-main);
+        }
+        .plyr__menu__button--radio[aria-checked="true"]::before {
+             background: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <video id="player" playsinline controls>
+            <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4" />
+
+            <!-- Subtitle Tracks -->
+            <track kind="captions" label="English" srclang="en" default />
+            <track kind="captions" label="Persian" srclang="fa" />
+        </video>
+    </div>
+
+    <!-- Plyr.io JavaScript -->
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 1. WebVTT Content for Subtitles ---
+            const vttContentEn = `WEBVTT
+
+1
+00:00:02.200 --> 00:00:04.500
+[Birds chirping]
+
+2
+00:00:06.000 --> 00:00:09.000
+Big Buck Bunny wakes up.
+
+3
+00:00:10.500 --> 00:00:13.000
+He enjoys the beautiful day.
+`;
+
+            const vttContentFa = `WEBVTT
+
+1
+00:00:02.200 --> 00:00:04.500
+[صدای جیک جیک پرندگان]
+
+2
+00:00:06.000 --> 00:00:09.000
+بانی خرگوشه بزرگ از خواب بیدار می شود.
+
+3
+00:00:10.500 --> 00:00:13.000
+او از روز زیبا لذت می برد.
+`;
+
+            // --- 2. Create Blob URLs for VTT Content ---
+            // This allows us to use dynamic string content for our subtitles
+            const blobEn = new Blob([vttContentEn], { type: 'text/vtt' });
+            const urlEn = URL.createObjectURL(blobEn);
+
+            const blobFa = new Blob([vttContentFa], { type: 'text/vtt' });
+            const urlFa = URL.createObjectURL(blobFa);
+
+            // Set the generated URLs as the source for the track elements
+            const tracks = document.querySelectorAll('track');
+            tracks[0].src = urlEn; // English
+            tracks[1].src = urlFa; // Persian
+
+            // --- 3. Plyr Player Initialization ---
+            const player = new Plyr('#player', {
+                // --- Player Controls Configuration ---
+                // We list all the controls we want to appear in the player.
+                // The order of the strings in the array determines their order in the UI.
+                controls: [
+                    'play-large',       // The large play button in the center
+                    'play',             // Play/Pause button
+                    'progress',         // The progress bar (seek bar)
+                    'current-time',     // Current time display
+                    'duration',         // Total duration display
+                    'mute',             // Mute/unmute button
+                    'volume',           // Volume slider
+                    'captions',         // Subtitles/CC button
+                    'settings',         // Settings cog button
+                    'pip',              // Picture-in-Picture button
+                    'fullscreen',       // Fullscreen button
+                ],
+
+                // --- Settings Menu Configuration ---
+                // This is where we define the options for playback speed and quality.
+                settings: ['captions', 'quality', 'speed'],
+
+                // --- Playback Speed Options ---
+                speed: {
+                    selected: 1, // Default speed is Normal (1x)
+                    options: [0.5, 0.75, 1, 1.25, 1.5, 2]
+                },
+
+                // --- Video Quality Options ---
+                // For this demo, these are placeholders.
+                // In a real application, you would dynamically provide different source files.
+                quality: {
+                    default: 1080,
+                    options: [1080, 720],
+                    // This function would be called when the user changes quality.
+                    // You would implement logic to switch video sources here.
+                    forced: true,
+                    onChange: (quality) => {
+                        console.log('Quality changed to:', quality);
+                        // Example: window.location.href = `?quality=${quality}`;
+                    },
+                },
+
+                // --- Thumbnail Scrubbing (Seek Preview) ---
+                // Enable tooltips and provide the thumbnail source.
+                // NOTE: For this to work, you need a server-side script to generate
+                // a sprite of video frames. The URL provided here is a placeholder
+                // from the official Plyr.io demo.
+                previewThumbnails: {
+                    enabled: true,
+                    src: 'https://cdn.plyr.io/static/demo/thumbs/100p.vtt'
+                },
+
+                // --- Tooltips for Controls ---
+                // Improves user experience by showing what each button does on hover.
+                tooltips: {
+                    controls: true,
+                    seek: true // Show time tooltip on seek bar hover
+                },
+            });
+
+            // Make the player instance available in the window for debugging
+            window.player = player;
+
+            // Clean up Blob URLs when the page is unloaded to prevent memory leaks
+            window.addEventListener('beforeunload', () => {
+                URL.revokeObjectURL(urlEn);
+                URL.revokeObjectURL(urlFa);
+            });
+        });
+    </script>
+</body>
+</html>

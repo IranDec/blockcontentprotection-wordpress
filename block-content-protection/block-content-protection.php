@@ -418,8 +418,12 @@ function bcp_enqueue_scripts() {
             $options['watermark_text'] = str_replace( array_keys( $replacements ), array_values( $replacements ), $options['watermark_text'] );
         }
 
+        // Enqueue Plyr.io assets
+        wp_enqueue_style( 'plyr-css', 'https://cdn.plyr.io/3.7.8/plyr.css', [], '3.7.8' );
+        wp_enqueue_script( 'plyr-js', 'https://cdn.plyr.io/3.7.8/plyr.js', [], '3.7.8', true );
+
         // Enqueue the new module script
-        wp_enqueue_script( 'bcp-protect-module', BCP_PLUGIN_URL . 'js/protect.module.js', [], '1.6.6', true );
+        wp_enqueue_script( 'bcp-protect-module', BCP_PLUGIN_URL . 'js/protect.module.js', ['plyr-js'], '1.7.0', true );
 
         // Create a data bridge for the module
         add_action('wp_footer', function() use ($options) {
@@ -429,7 +433,7 @@ function bcp_enqueue_scripts() {
 
         // Enqueue styles if needed
         if ( ! empty( $options['enhanced_protection'] ) || ! empty( $options['video_screen_record_block'] ) || ! empty( $options['enable_video_watermark'] ) ) {
-            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', [], '1.6.6' );
+            wp_enqueue_style( 'bcp-protect-css', BCP_PLUGIN_URL . 'css/protect.css', ['plyr-css'], '1.7.0' );
         }
     }
 }
