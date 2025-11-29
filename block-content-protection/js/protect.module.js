@@ -9,95 +9,57 @@ if (settingsElement) {
     }
 }
 
-// Use a WeakSet to keep track of media that has already been processed
-const processedMedia = new WeakSet();
+// Use a WeakSet to keep track of videos that have already been processed
+const processedVideos = new WeakSet();
 
-// --- Device ID Management ---
-const getDeviceId = () => {
-    let deviceId = localStorage.getItem('bcp_device_id');
-    if (!deviceId) {
-        // Generate a simple unique ID
-        deviceId = 'bcp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('bcp_device_id', deviceId);
-    }
-    return deviceId;
-};
-
-// --- Core Media Protection Logic ---
-const protectMedia = (media) => {
-    // Exit if the media has already been processed or is marked as protected
-    if (processedMedia.has(media) || media.dataset.bcpProtected === 'true') return;
-    processedMedia.add(media);
-    media.dataset.bcpProtected = 'true';
+// --- Core Video Protection Logic ---
+const protectVideo = (video) => {
+    // Exit if the video has already been processed or is marked as protected
+    if (processedVideos.has(video) || video.dataset.bcpProtected === 'true') return;
+    processedVideos.add(video);
+    video.dataset.bcpProtected = 'true';
 
     // Disable native controls that are not needed
-    media.setAttribute('controlsList', 'nodownload');
-    if (media.tagName === 'VIDEO') {
-        media.setAttribute('disablePictureInPicture', 'true');
-    }
+    video.setAttribute('controlsList', 'nodownload');
+    video.setAttribute('disablePictureInPicture', 'true');
 
-    let wrapper;
-    if (media.tagName === 'VIDEO') {
-        wrapper = document.createElement('div');
-        wrapper.classList.add('bcp-watermark-wrapper');
-        media.parentNode.insertBefore(wrapper, media);
-        wrapper.appendChild(media);
-    } else {
-        wrapper = media;
-    }
+    // Create a wrapper for the video and its watermark
+    let wrapper = document.createElement('div');
+    wrapper.classList.add('bcp-watermark-wrapper');
+    // Insert the wrapper before the video and then move the video inside it
+    video.parentNode.insertBefore(wrapper, video);
+    wrapper.appendChild(video);
 
     // Apply watermark if enabled in settings
-    if (media.tagName === 'VIDEO' && bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
+    if (bcp_settings.enable_video_watermark && bcp_settings.watermark_text) {
         applyWatermark(wrapper);
-        addCustomControls(wrapper);
     }
 
-    // --- Device ID Handling for Media URLs ---
-    if (bcp_settings.enable_device_limit) {
-        const deviceId = getDeviceId();
-        const placeholder = '{DEVICE_ID}';
+    // Add the custom fullscreen button
+    addCustomFullscreenButton(wrapper);
 
-        // Replace placeholder in the main src attribute
-        const currentSrc = media.getAttribute('src');
-        if (currentSrc && currentSrc.includes(placeholder)) {
-            media.setAttribute('src', currentSrc.replace(placeholder, deviceId));
-        }
-
-        // Replace placeholder in any <source> elements
-        media.querySelectorAll('source').forEach(source => {
-            const sourceSrc = source.getAttribute('src');
-            if (sourceSrc && sourceSrc.includes(placeholder)) {
-                source.setAttribute('src', sourceSrc.replace(placeholder, deviceId));
-            }
-        });
-    }
-
-    // Secure the media source if download protection is enabled
-    if (bcp_settings.disable_media_download) {
-        protectMediaSource(media);
+    // Secure the video source if download protection is enabled
+    if (bcp_settings.disable_video_download) {
+        protectVideoSource(video);
     }
 };
 
-const protectMediaSource = (media) => {
-    const originalSrc = media.getAttribute('src') || media.querySelector('source')?.getAttribute('src');
-
-    // If the URL is already a secure link from the server, don't convert it to a Blob.
-    if (originalSrc && (originalSrc.includes('bcp_media_token=') || originalSrc.startsWith('blob:'))) {
-        return;
-    }
-
-    if (originalSrc) {
+const protectVideoSource = (video) => {
+    const originalSrc = video.getAttribute('src') || video.querySelector('source')?.getAttribute('src');
+    // Only process if there's a source and it's not already a blob URL
+    if (originalSrc && !originalSrc.startsWith('blob:')) {
+        // Fetch the video as a blob to obscure the direct URL
         fetch(originalSrc, { credentials: 'omit' })
             .then(response => {
-                if (!response.ok) throw new Error(`BCP: Network error fetching media: ${response.statusText}`);
+                if (!response.ok) throw new Error(`BCP: Network error fetching video: ${response.statusText}`);
                 return response.blob();
             })
             .then(blob => {
-                media.src = URL.createObjectURL(blob);
+                video.src = URL.createObjectURL(blob);
             })
             .catch(err => {
                 console.error('BCP Error:', err);
-                media.setAttribute('src', originalSrc); // Restore original source on failure
+                video.setAttribute('src', originalSrc); // Restore original source on failure
             });
     }
 }
@@ -129,118 +91,23 @@ const applyWatermark = (wrapper) => {
     wrapper.appendChild(element);
 };
 
-const addCustomControls = (wrapper) => {
-    const video = wrapper.querySelector('video');
-    if (!video) return;
+const addCustomFullscreenButton = (wrapper) => {
+    const button = document.createElement('button');
+    button.className = 'bcp-custom-fullscreen-btn';
+    button.setAttribute('aria-label', 'Enter Fullscreen');
+    button.innerHTML = '<svg viewbox="0 0 18 18"><path d="M4.5 11H3v4h4v-1.5H4.5V11zM3 7h1.5V4.5H7V3H3v4zm10.5 6.5H11V15h4v-4h-1.5v2.5zM11 3v1.5h2.5V7H15V3h-4z"></path></svg>';
+    wrapper.appendChild(button);
 
-    // Create the main controls container
-    const controlsContainer = document.createElement('div');
-    controlsContainer.className = 'bcp-custom-controls';
-
-    // Create the timeline
-    const timeline = document.createElement('div');
-    timeline.className = 'bcp-timeline';
-    const progress = document.createElement('div');
-    progress.className = 'bcp-progress';
-    timeline.appendChild(progress);
-    controlsContainer.appendChild(timeline);
-
-    // Create the bottom controls row
-    const bottomControls = document.createElement('div');
-    bottomControls.className = 'bcp-bottom-controls';
-
-    // Left side controls (Play, Rewind, Forward, Volume)
-    const leftControls = document.createElement('div');
-    leftControls.className = 'bcp-left-controls';
-
-    const playBtn = document.createElement('button');
-    playBtn.innerHTML = '<svg viewbox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>'; // Play icon
-    const pauseIcon = '<svg viewbox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>'; // Pause icon
-    leftControls.appendChild(playBtn);
-
-    const rewindBtn = document.createElement('button');
-    rewindBtn.innerHTML = '<svg viewbox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"></path></svg>'; // Rewind icon
-    leftControls.appendChild(rewindBtn);
-
-    const forwardBtn = document.createElement('button');
-    forwardBtn.innerHTML = '<svg viewbox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"></path></svg>'; // Forward icon
-    leftControls.appendChild(forwardBtn);
-
-    const volumeBtn = document.createElement('button');
-    volumeBtn.innerHTML = '<svg viewbox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>'; // Volume icon
-    leftControls.appendChild(volumeBtn);
-
-    const volumeSlider = document.createElement('input');
-    volumeSlider.type = 'range';
-    volumeSlider.min = '0';
-    volumeSlider.max = '1';
-    volumeSlider.step = '0.1';
-    volumeSlider.value = '1';
-    volumeSlider.className = 'bcp-volume-slider';
-    leftControls.appendChild(volumeSlider);
-
-    bottomControls.appendChild(leftControls);
-
-    // Right side controls (Time, Settings, Fullscreen)
-    const rightControls = document.createElement('div');
-    rightControls.className = 'bcp-right-controls';
-
-    const timeDisplay = document.createElement('span');
-    timeDisplay.className = 'bcp-time-display';
-    timeDisplay.textContent = '0:00 / 0:00';
-    rightControls.appendChild(timeDisplay);
-
-    const settingsBtn = document.createElement('button');
-    settingsBtn.innerHTML = '<svg viewbox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"></path></svg>';
-    rightControls.appendChild(settingsBtn);
-
-    const fullscreenBtn = document.createElement('button');
-    fullscreenBtn.innerHTML = '<svg viewbox="0 0 18 18"><path d="M4.5 11H3v4h4v-1.5H4.5V11zM3 7h1.5V4.5H7V3H3v4zm10.5 6.5H11V15h4v-4h-1.5v2.5zM11 3v1.5h2.5V7H15V3h-4z"></path></svg>';
-    rightControls.appendChild(fullscreenBtn);
-
-    bottomControls.appendChild(rightControls);
-    controlsContainer.appendChild(bottomControls);
-    wrapper.appendChild(controlsContainer);
-
-    // --- Event Listeners for Controls ---
-    playBtn.addEventListener('click', () => {
-        if (video.paused) {
-            video.play();
-            playBtn.innerHTML = pauseIcon;
+    // Handle cross-browser fullscreen requests
+    button.addEventListener('click', () => {
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            if (wrapper.requestFullscreen) wrapper.requestFullscreen();
+            else if (wrapper.webkitRequestFullscreen) wrapper.webkitRequestFullscreen();
         } else {
-            video.pause();
-            playBtn.innerHTML = '<svg viewbox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>'; // Play icon
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
         }
     });
-
-    rewindBtn.addEventListener('click', () => video.currentTime -= 5);
-    forwardBtn.addEventListener('click', () => video.currentTime += 5);
-    volumeSlider.addEventListener('input', (e) => video.volume = e.target.value);
-
-    video.addEventListener('timeupdate', () => {
-        const progressPercent = (video.currentTime / video.duration) * 100;
-        progress.style.width = `${progressPercent}%`;
-        timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-    });
-
-    timeline.addEventListener('click', (e) => {
-        const timelineWidth = timeline.clientWidth;
-        video.currentTime = (e.offsetX / timelineWidth) * video.duration;
-    });
-
-    fullscreenBtn.addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-            wrapper.requestFullscreen();
-        } else {
-            document.exitFullscreen();
-        }
-    });
-
-    function formatTime(time) {
-        const minutes = Math.floor(time / 60);
-        const seconds = Math.floor(time % 60).toString().padStart(2, '0');
-        return `${minutes}:${seconds}`;
-    }
 };
 
 // --- General Protection Event Handlers ---
@@ -307,8 +174,8 @@ const handleScreenRecording = () => {
 
 // --- Initialization ---
 const initProtection = () => {
-    // Apply protection to all existing video and audio elements on the page
-    document.querySelectorAll('video, audio').forEach(protectMedia);
+    // Apply protection to all existing video elements on the page
+    document.querySelectorAll('video').forEach(protectVideo);
     // Disable text selection if enabled
     if (bcp_settings.disable_text_selection) {
         document.body.style.cssText += 'user-select:none;-webkit-user-select:none;';
@@ -324,11 +191,11 @@ const observer = new MutationObserver(mutations => {
     mutations.forEach(mutation => {
         mutation.addedNodes.forEach(node => {
             if (node.nodeType === 1) { // Element node
-                if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO') {
-                    protectMedia(node);
+                if (node.tagName === 'VIDEO') {
+                    protectVideo(node);
                 } else {
-                    // Also check for media within newly added complex elements
-                    node.querySelectorAll?.('video, audio').forEach(protectMedia);
+                    // Also check for videos within newly added complex elements
+                    node.querySelectorAll?.('video').forEach(protectVideo);
                 }
             }
         });

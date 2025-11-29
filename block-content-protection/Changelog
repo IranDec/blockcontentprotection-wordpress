@@ -2,24 +2,6 @@
 
 All notable changes to Block Content Protection will be documented in this file.
 
-## [1.7.1] - 2025-11-26
-
-### Added
-- **Limit Active Sessions**: Added a new setting to limit users to a single active session at a time.
-  - If enabled, logging in from a new device automatically logs out all other sessions for that user.
-- **Digits Compatibility**: Added support for the Digits plugin (and others that use `set_auth_cookie`) to ensure device tracking works correctly even when standard login hooks are bypassed.
-- **Auto-Rotation**: Improved device limit handling to automatically remove the oldest device if the limit is exceeded during a non-standard login (e.g., via AJAX or Digits), ensuring users are not locked out.
-
-## [1.7.0] - 2025-11-26
-
-### Added
-- **Device Limitation**: Implemented a robust device limitation system to prevent account sharing.
-  - Users are restricted to a configurable number of concurrent devices (default: 3).
-  - When the limit is reached, users are prompted to either automatically log out the oldest device or manually select a device to remove.
-  - A new device management section has been added to the user's profile page, allowing them to view and remove active devices.
-- **Immediate Session Termination**: Implemented a new security measure that immediately terminates a user's session if their device is removed from the active devices list.
-  - This check is performed on every page load to ensure that users cannot continue to access content after their device has been removed.
-
 ## [1.6.6] - 2025-10-27
 
 ### Fixed
