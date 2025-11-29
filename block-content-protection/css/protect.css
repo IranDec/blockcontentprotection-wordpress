@@ -17,74 +17,31 @@
     pointer-events: auto;
 }
 
-/* --- Custom Video Player UI --- */
-.bcp-custom-controls {
-    z-index: 10000;
+/* Custom fullscreen button */
+.bcp-custom-fullscreen-btn {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 10px;
-    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+    bottom: 10px;
+    right: 10px;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 8px;
     opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-    display: flex;
-    flex-direction: column;
+    transition: opacity 0.2s ease-in-out;
 }
 
-.bcp-watermark-wrapper:hover .bcp-custom-controls {
+/* Show the button on hover */
+.bcp-watermark-wrapper:hover .bcp-custom-fullscreen-btn {
     opacity: 1;
 }
 
-.bcp-timeline {
-    width: 100%;
-    height: 4px;
-    background-color: rgba(255,255,255,0.3);
-    cursor: pointer;
-    margin-bottom: 10px;
-}
-
-.bcp-progress {
-    width: 0%;
-    height: 100%;
-    background-color: #fff;
-}
-
-.bcp-bottom-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
-.bcp-left-controls, .bcp-right-controls {
-    display: flex;
-    align-items: center;
-}
-
-.bcp-custom-controls button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0 8px;
-}
-
-.bcp-custom-controls button svg {
-    width: 24px;
-    height: 24px;
+.bcp-custom-fullscreen-btn svg {
+    width: 20px;
+    height: 20px;
     fill: #fff;
-    pointer-events: none;
-}
-
-.bcp-volume-slider {
-    width: 80px;
-    margin-left: 8px;
-}
-
-.bcp-time-display {
-    color: #fff;
-    font-size: 14px;
-    margin-right: 15px;
+    display: block;
 }
 
 /* --- Fullscreen State --- */
@@ -176,7 +133,7 @@ video::-webkit-media-controls-panel [role="button"][aria-label~="fullscreen" i] 
 }
 
 /* --- Screen Recording/Screenshot Protection --- */
-.bcp-recording-detected video {
+.bcp-recording-detected > video {
     filter: brightness(0) !important;
 }
 
